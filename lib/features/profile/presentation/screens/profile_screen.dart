@@ -29,8 +29,10 @@ class ProfileScreen extends ConsumerWidget {
         data: (profile) {
           if (profile == null) {
             return const Center(
-              child: Text('Không tìm thấy hồ sơ',
-                  style: TextStyle(color: AppColors.textTertiary)),
+              child: Text(
+                'Không tìm thấy hồ sơ',
+                style: TextStyle(color: AppColors.textTertiary),
+              ),
             );
           }
 
@@ -69,8 +71,10 @@ class ProfileScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: AppSizes.sm),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.surfaceLight,
                     borderRadius: BorderRadius.circular(20),
@@ -78,8 +82,10 @@ class ProfileScreen extends ConsumerWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(profile.statusEmoji,
-                          style: const TextStyle(fontSize: 18)),
+                      Text(
+                        profile.statusEmoji,
+                        style: const TextStyle(fontSize: 18),
+                      ),
                       if (profile.statusText.isNotEmpty) ...[
                         const SizedBox(width: 6),
                         Text(
@@ -101,8 +107,7 @@ class ProfileScreen extends ConsumerWidget {
                     padding: const EdgeInsets.all(AppSizes.md),
                     decoration: BoxDecoration(
                       gradient: AppColors.cardGradient,
-                      borderRadius:
-                          BorderRadius.circular(AppSizes.radiusMd),
+                      borderRadius: BorderRadius.circular(AppSizes.radiusMd),
                     ),
                     child: Text(
                       profile.bio,
@@ -121,37 +126,34 @@ class ProfileScreen extends ConsumerWidget {
                   padding: const EdgeInsets.all(AppSizes.lg),
                   decoration: BoxDecoration(
                     gradient: AppColors.cardGradient,
-                    borderRadius:
-                        BorderRadius.circular(AppSizes.radiusLg),
+                    borderRadius: BorderRadius.circular(AppSizes.radiusLg),
                     border: Border.all(
-                        color: AppColors.border.withValues(alpha: 0.5)),
+                      color: AppColors.border.withValues(alpha: 0.5),
+                    ),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
                       _StatItem(
-                          icon: Icons.people,
-                          label: 'Bạn bè',
-                          value: '0',
-                          color: AppColors.primary),
-                      Container(
-                          width: 1,
-                          height: 40,
-                          color: AppColors.divider),
+                        icon: Icons.people,
+                        label: 'Bạn bè',
+                        value: '0',
+                        color: AppColors.primary,
+                      ),
+                      Container(width: 1, height: 40, color: AppColors.divider),
                       _StatItem(
-                          icon: Icons.location_on,
-                          label: 'Địa điểm',
-                          value: '0',
-                          color: AppColors.secondary),
-                      Container(
-                          width: 1,
-                          height: 40,
-                          color: AppColors.divider),
+                        icon: Icons.location_on,
+                        label: 'Địa điểm',
+                        value: '0',
+                        color: AppColors.secondary,
+                      ),
+                      Container(width: 1, height: 40, color: AppColors.divider),
                       _StatItem(
-                          icon: Icons.calendar_today,
-                          label: 'Tham gia',
-                          value: _formatDate(profile.createdAt),
-                          color: AppColors.info),
+                        icon: Icons.calendar_today,
+                        label: 'Tham gia',
+                        value: _formatDate(profile.createdAt),
+                        color: AppColors.info,
+                      ),
                     ],
                   ),
                 ),
@@ -160,8 +162,7 @@ class ProfileScreen extends ConsumerWidget {
                 Container(
                   decoration: BoxDecoration(
                     color: AppColors.card,
-                    borderRadius:
-                        BorderRadius.circular(AppSizes.radiusMd),
+                    borderRadius: BorderRadius.circular(AppSizes.radiusMd),
                   ),
                   child: Column(
                     children: [
@@ -169,9 +170,10 @@ class ProfileScreen extends ConsumerWidget {
                         icon: Icons.location_on_outlined,
                         title: 'Chia sẻ vị trí',
                         trailing: Switch(
-                            value: true,
-                            onChanged: (v) {},
-                            activeColor: AppColors.primary),
+                          value: true,
+                          onChanged: (v) {},
+                          activeThumbColor: AppColors.primary,
+                        ),
                       ),
                       const Divider(height: 1, indent: 56, endIndent: 16),
                       _SettingsTile(
@@ -195,9 +197,7 @@ class ProfileScreen extends ConsumerWidget {
                   outlined: true,
                   isLoading: isLoading,
                   onPressed: () async {
-                    await ref
-                        .read(authProvider.notifier)
-                        .signOut();
+                    await ref.read(authProvider.notifier).signOut();
                     if (context.mounted) context.go('/login');
                   },
                 ),
@@ -210,8 +210,10 @@ class ProfileScreen extends ConsumerWidget {
           child: CircularProgressIndicator(color: AppColors.primary),
         ),
         error: (error, _) => Center(
-          child: Text('Lỗi: $error',
-              style: const TextStyle(color: AppColors.error)),
+          child: Text(
+            'Lỗi: $error',
+            style: const TextStyle(color: AppColors.error),
+          ),
         ),
       ),
     );
@@ -228,11 +230,12 @@ class _StatItem extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-  const _StatItem(
-      {required this.icon,
-      required this.label,
-      required this.value,
-      required this.color});
+  const _StatItem({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -240,18 +243,24 @@ class _StatItem extends StatelessWidget {
       children: [
         Icon(icon, color: color, size: 22),
         const SizedBox(height: 6),
-        Text(value,
-            style: const TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary)),
+        Text(
+          value,
+          style: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
         const SizedBox(height: 2),
-        Text(label,
-            style: const TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 11,
-                color: AppColors.textTertiary)),
+        Text(
+          label,
+          style: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 11,
+            color: AppColors.textTertiary,
+          ),
+        ),
       ],
     );
   }
@@ -262,8 +271,12 @@ class _SettingsTile extends StatelessWidget {
   final String title;
   final VoidCallback? onTap;
   final Widget? trailing;
-  const _SettingsTile(
-      {required this.icon, required this.title, this.onTap, this.trailing});
+  const _SettingsTile({
+    required this.icon,
+    required this.title,
+    this.onTap,
+    this.trailing,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -278,13 +291,17 @@ class _SettingsTile extends StatelessWidget {
         ),
         child: Icon(icon, color: AppColors.primary, size: 20),
       ),
-      title: Text(title,
-          style: const TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary)),
-      trailing: trailing ??
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
+      ),
+      trailing:
+          trailing ??
           const Icon(Icons.chevron_right, color: AppColors.textTertiary),
     );
   }

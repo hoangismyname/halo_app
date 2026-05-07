@@ -27,7 +27,11 @@ class FriendsListScreen extends ConsumerWidget {
                 gradient: AppColors.primaryGradient,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.person_add, size: 20, color: Colors.white),
+              child: const Icon(
+                Icons.person_add,
+                size: 20,
+                color: Colors.white,
+              ),
             ),
           ),
         ],
@@ -44,12 +48,18 @@ class FriendsListScreen extends ConsumerWidget {
                   children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(
-                          AppSizes.md, AppSizes.md, AppSizes.md, AppSizes.sm),
+                        AppSizes.md,
+                        AppSizes.md,
+                        AppSizes.md,
+                        AppSizes.sm,
+                      ),
                       child: Row(
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.warning.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(10),
@@ -83,7 +93,7 @@ class FriendsListScreen extends ConsumerWidget {
               );
             },
             loading: () => const SliverToBoxAdapter(),
-            error: (_, __) => const SliverToBoxAdapter(),
+            error: (_, _) => const SliverToBoxAdapter(),
           ),
 
           // Friends list
@@ -100,7 +110,9 @@ class FriendsListScreen extends ConsumerWidget {
                           Icon(
                             Icons.people_outline,
                             size: 64,
-                            color: AppColors.textTertiary.withValues(alpha: 0.5),
+                            color: AppColors.textTertiary.withValues(
+                              alpha: 0.5,
+                            ),
                           ),
                           const SizedBox(height: AppSizes.md),
                           const Text(
@@ -128,13 +140,10 @@ class FriendsListScreen extends ConsumerWidget {
                 }
 
                 return SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final friend = friends[index];
-                      return _FriendTile(friend: friend);
-                    },
-                    childCount: friends.length,
-                  ),
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final friend = friends[index];
+                    return _FriendTile(friend: friend);
+                  }, childCount: friends.length),
                 );
               },
               loading: () => const SliverFillRemaining(
@@ -173,7 +182,9 @@ class _FriendTile extends StatelessWidget {
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(
-            horizontal: AppSizes.md, vertical: AppSizes.xs),
+          horizontal: AppSizes.md,
+          vertical: AppSizes.xs,
+        ),
         leading: HaloAvatar(
           imageUrl: friend.avatarUrl,
           name: friend.displayName.isNotEmpty
@@ -183,9 +194,7 @@ class _FriendTile extends StatelessWidget {
           size: AppSizes.avatarMd,
         ),
         title: Text(
-          friend.displayName.isNotEmpty
-              ? friend.displayName
-              : friend.username,
+          friend.displayName.isNotEmpty ? friend.displayName : friend.username,
           style: const TextStyle(
             fontFamily: 'Inter',
             fontWeight: FontWeight.w600,
@@ -194,10 +203,7 @@ class _FriendTile extends StatelessWidget {
         ),
         subtitle: Row(
           children: [
-            Text(
-              friend.statusEmoji,
-              style: const TextStyle(fontSize: 14),
-            ),
+            Text(friend.statusEmoji, style: const TextStyle(fontSize: 14)),
             const SizedBox(width: 4),
             Expanded(
               child: Text(
@@ -218,8 +224,11 @@ class _FriendTile extends StatelessWidget {
           onPressed: () {
             // Open chat with this friend
           },
-          icon: const Icon(Icons.chat_bubble_outline,
-              color: AppColors.primary, size: 20),
+          icon: const Icon(
+            Icons.chat_bubble_outline,
+            color: AppColors.primary,
+            size: 20,
+          ),
         ),
       ),
     );
@@ -238,14 +247,14 @@ class _RequestTile extends ConsumerWidget {
 
     return Container(
       margin: const EdgeInsets.symmetric(
-          horizontal: AppSizes.md, vertical: AppSizes.xs),
+        horizontal: AppSizes.md,
+        vertical: AppSizes.xs,
+      ),
       padding: const EdgeInsets.all(AppSizes.md),
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-        border: Border.all(
-          color: AppColors.warning.withValues(alpha: 0.2),
-        ),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -281,7 +290,9 @@ class _RequestTile extends ConsumerWidget {
           // Accept
           IconButton(
             onPressed: () {
-              ref.read(friendsActionsProvider.notifier).acceptRequest(requestId);
+              ref
+                  .read(friendsActionsProvider.notifier)
+                  .acceptRequest(requestId);
             },
             icon: Container(
               padding: const EdgeInsets.all(6),
@@ -289,8 +300,7 @@ class _RequestTile extends ConsumerWidget {
                 color: AppColors.online.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child:
-                  const Icon(Icons.check, color: AppColors.online, size: 18),
+              child: const Icon(Icons.check, color: AppColors.online, size: 18),
             ),
           ),
           // Reject
@@ -304,8 +314,7 @@ class _RequestTile extends ConsumerWidget {
                 color: AppColors.error.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child:
-                  const Icon(Icons.close, color: AppColors.error, size: 18),
+              child: const Icon(Icons.close, color: AppColors.error, size: 18),
             ),
           ),
         ],

@@ -44,7 +44,7 @@ extension DateTimeExtensions on DateTime {
     if (diff.inMinutes < 60) return '${diff.inMinutes} phút trước';
     if (diff.inHours < 24) return '${diff.inHours} giờ trước';
     if (diff.inDays < 7) return '${diff.inDays} ngày trước';
-    return '${day}/${month}/${year}';
+    return '$day/$month/$year';
   }
 
   String get chatTime {
