@@ -35,6 +35,6 @@ class StatusRepository {
 }
 
 @riverpod
-StatusRepository statusRepository(ref) {
+StatusRepository statusRepository(Ref ref) {
   return StatusRepository(Supabase.instance.client);
 }

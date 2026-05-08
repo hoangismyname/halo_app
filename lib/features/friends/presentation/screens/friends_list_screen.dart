@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/friends_provider.dart';
 import '../../../auth/domain/user_model.dart';
+import '../../../chat/chat_providers.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/widgets/halo_avatar.dart';
@@ -167,13 +168,13 @@ class FriendsListScreen extends ConsumerWidget {
   }
 }
 
-class _FriendTile extends StatelessWidget {
+class _FriendTile extends ConsumerWidget {
   final UserModel friend;
 
   const _FriendTile({required this.friend});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       margin: const EdgeInsets.only(bottom: AppSizes.sm),
       decoration: BoxDecoration(
@@ -221,8 +222,13 @@ class _FriendTile extends StatelessWidget {
           ],
         ),
         trailing: IconButton(
-          onPressed: () {
-            // Open chat with this friend
+          onPressed: () async {
+            final roomId = await ref
+                .read(chatActionsProvider.notifier)
+                .getOrCreateDM(friend.id);
+            if (roomId != null && context.mounted) {
+              context.push('/chat/$roomId');
+            }
           },
           icon: const Icon(
             Icons.chat_bubble_outline,

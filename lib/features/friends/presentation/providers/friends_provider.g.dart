@@ -50,7 +50,7 @@ final class FriendsListProvider
   }
 }
 
-String _$friendsListHash() => r'3b8986aa8738e55d506af1b2ba7fdbe4abf8c52c';
+String _$friendsListHash() => r'4e49709352ece4cecde1474ce9751cb13f60eb01';
 
 /// Pending friend requests
 
@@ -96,7 +96,7 @@ final class PendingRequestsProvider
   }
 }
 
-String _$pendingRequestsHash() => r'3e4c17746da62a5f9ac925a1aee4bc05219d37ac';
+String _$pendingRequestsHash() => r'3f457d7addaadf60ab3662988c0af17d20e77232';
 
 /// Search users
 

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(openrouteservice.org)",
+      "WebFetch(openweathermap.org)"
+    ]
+  },
+  "$version": 3
+}

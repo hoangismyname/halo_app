@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../friends/presentation/providers/friends_provider.dart';
+import '../../../map/presentation/providers/location_provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/widgets/halo_avatar.dart';
@@ -14,6 +16,9 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(currentProfileProvider);
     final isLoading = ref.watch(authProvider).isLoading;
+    final friendsAsync = ref.watch(friendsListProvider);
+    final friendsCount = friendsAsync.value?.length ?? 0;
+    final isLocationSharing = ref.watch(locationSharingProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -137,7 +142,7 @@ class ProfileScreen extends ConsumerWidget {
                       _StatItem(
                         icon: Icons.people,
                         label: 'Bạn bè',
-                        value: '0',
+                        value: '$friendsCount',
                         color: AppColors.primary,
                       ),
                       Container(width: 1, height: 40, color: AppColors.divider),
@@ -170,8 +175,10 @@ class ProfileScreen extends ConsumerWidget {
                         icon: Icons.location_on_outlined,
                         title: 'Chia sẻ vị trí',
                         trailing: Switch(
-                          value: true,
-                          onChanged: (v) {},
+                          value: isLocationSharing,
+                          onChanged: (v) {
+                            ref.read(locationSharingProvider.notifier).toggle();
+                          },
                           activeThumbColor: AppColors.primary,
                         ),
                       ),

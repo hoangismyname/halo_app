@@ -31,6 +31,75 @@ class ChatRepository {
     return rooms;
   }
 
+  /// Get all chat rooms with last message info
+  Future<List<Map<String, dynamic>>> getChatRoomsWithLastMessage() async {
+    if (_userId == null) return [];
+
+    final data = await _client
+        .from(SupabaseConstants.chatRoomMembersTable)
+        .select('room_id, chat_rooms(*)')
+        .eq('user_id', _userId!);
+
+    final results = <Map<String, dynamic>>[];
+    for (final row in data) {
+      final room = row['chat_rooms'] as Map<String, dynamic>?;
+      if (room == null) continue;
+
+      final roomId = room['id'] as String;
+
+      // Get last message for this room
+      final lastMsgData = await _client
+          .from(SupabaseConstants.messagesTable)
+          .select('content, message_type, created_at, sender_id')
+          .eq('room_id', roomId)
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      // Get other member profiles for DM room name
+      final members = await _client
+          .from(SupabaseConstants.chatRoomMembersTable)
+          .select('user_id, profiles(*)')
+          .eq('room_id', roomId)
+          .neq('user_id', _userId!);
+
+      String? otherName;
+      String? otherAvatar;
+      bool otherOnline = false;
+      if (members.isNotEmpty) {
+        final profile = members.first['profiles'] as Map<String, dynamic>?;
+        if (profile != null) {
+          otherName = profile['display_name'] as String? ??
+              profile['username'] as String?;
+          otherAvatar = profile['avatar_url'] as String?;
+          otherOnline = profile['is_online'] as bool? ?? false;
+        }
+      }
+
+      results.add({
+        'room': ChatRoomModel.fromJson(room),
+        'last_message': lastMsgData?['content'] as String?,
+        'last_message_type': lastMsgData?['message_type'] as String?,
+        'last_message_time': lastMsgData?['created_at'] as String?,
+        'other_name': otherName ?? room['name'] ?? 'Chat',
+        'other_avatar': otherAvatar,
+        'other_online': otherOnline,
+      });
+    }
+
+    // Sort by last message time, newest first
+    results.sort((a, b) {
+      final aTime = a['last_message_time'] as String?;
+      final bTime = b['last_message_time'] as String?;
+      if (aTime == null && bTime == null) return 0;
+      if (aTime == null) return 1;
+      if (bTime == null) return -1;
+      return bTime.compareTo(aTime);
+    });
+
+    return results;
+  }
+
   /// Create or get existing DM room
   Future<String> getOrCreateDMRoom(String otherUserId) async {
     if (_userId == null) throw Exception('Not authenticated');
@@ -176,6 +245,6 @@ class ChatRepository {
 }
 
 @riverpod
-ChatRepository chatRepository(ref) {
+ChatRepository chatRepository(Ref ref) {
   return ChatRepository(Supabase.instance.client);
 }

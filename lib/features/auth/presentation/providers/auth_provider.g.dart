@@ -45,7 +45,7 @@ final class AuthStateChangesProvider
   }
 }
 
-String _$authStateChangesHash() => r'cc8581bc9b917e40e2057a26c4e39b20bc4ac6b4';
+String _$authStateChangesHash() => r'084fabfae7a75366baf1801faab341eba4ef1545';
 
 /// Current authenticated user
 
@@ -90,7 +90,7 @@ final class CurrentUserProvider extends $FunctionalProvider<User?, User?, User?>
   }
 }
 
-String _$currentUserHash() => r'137a9b719f72706d8c122a7c6098e03cd0af0894';
+String _$currentUserHash() => r'645e80758f77ee9cf155850d553e1050dff412b0';
 
 /// Current user's profile
 
@@ -133,7 +133,7 @@ final class CurrentProfileProvider
   }
 }
 
-String _$currentProfileHash() => r'24665e3b3c7ef0ae1ca81855df80ad681de551af';
+String _$currentProfileHash() => r'f0b6158f86acb6d00db0d210c023816588115348';
 
 /// Auth notifier for login/signup/logout actions
 
@@ -163,7 +163,7 @@ final class AuthNotifierProvider
   AuthNotifier create() => AuthNotifier();
 }
 
-String _$authNotifierHash() => r'e0398d21a467982102d38245c9fb58e67c23a726';
+String _$authNotifierHash() => r'0bb500c1fade5c212345452a914ea6c474a4accd';
 
 /// Auth notifier for login/signup/logout actions
 
@@ -229,4 +229,4 @@ final class IsAuthenticatedProvider
   }
 }
 
-String _$isAuthenticatedHash() => r'04e1665da030cafe94d0fb9a120b250e6f570f5f';
+String _$isAuthenticatedHash() => r'b47866aaca90e2f9c9bec0d7eedd2b1aa5d4e8d5';

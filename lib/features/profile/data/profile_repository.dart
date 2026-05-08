@@ -69,6 +69,6 @@ class ProfileRepository {
 }
 
 @riverpod
-ProfileRepository profileRepository(ref) {
+ProfileRepository profileRepository(Ref ref) {
   return ProfileRepository(Supabase.instance.client);
 }

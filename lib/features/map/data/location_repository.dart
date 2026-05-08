@@ -123,7 +123,7 @@ class LocationRepository {
 }
 
 @riverpod
-LocationRepository locationRepository(ref) {
+LocationRepository locationRepository(Ref ref) {
   final repo = LocationRepository(Supabase.instance.client);
   ref.onDispose(() => repo.dispose());
   return repo;

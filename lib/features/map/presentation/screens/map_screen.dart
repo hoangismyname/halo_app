@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/location_repository.dart';
 import '../providers/location_provider.dart';
 import '../../../friends/presentation/providers/friends_provider.dart';
+import '../../../auth/domain/user_model.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/widgets/halo_avatar.dart';
@@ -100,11 +101,23 @@ class _MapScreenState extends ConsumerState<MapScreen>
     super.dispose();
   }
 
+  /// Find a friend's UserModel by userId from the friends list
+  UserModel? _findFriend(String userId, List<UserModel> friendsList) {
+    try {
+      return friendsList.firstWhere((f) => f.id == userId);
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final friendLocations = ref.watch(friendLocationsProvider);
-    final friends = ref.watch(friendsListProvider);
+    final friendsAsync = ref.watch(friendsListProvider);
     final isSharing = ref.watch(locationSharingProvider);
+
+    // Extract friends list safely
+    final friendsList = friendsAsync.value ?? [];
 
     return Scaffold(
       body: Stack(
@@ -130,7 +143,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
 
               // Friend markers
               MarkerLayer(
-                markers: _buildFriendMarkers(friendLocations, friends),
+                markers: _buildFriendMarkers(friendLocations, friendsList),
               ),
 
               // My location marker
@@ -193,45 +206,48 @@ class _MapScreenState extends ConsumerState<MapScreen>
 
                 // Location sharing toggle
                 if (!kIsWeb)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isSharing
-                          ? AppColors.online.withValues(alpha: 0.15)
-                          : AppColors.surfaceLight,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isSharing
-                            ? AppColors.online.withValues(alpha: 0.3)
-                            : AppColors.border,
+                  GestureDetector(
+                    onTap: () => ref.read(locationSharingProvider.notifier).toggle(),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
                       ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isSharing ? Icons.location_on : Icons.location_off,
-                          size: 16,
+                      decoration: BoxDecoration(
+                        color: isSharing
+                            ? AppColors.online.withValues(alpha: 0.15)
+                            : AppColors.surfaceLight,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
                           color: isSharing
-                              ? AppColors.online
-                              : AppColors.textTertiary,
+                              ? AppColors.online.withValues(alpha: 0.3)
+                              : AppColors.border,
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          isSharing ? 'Đang chia sẻ' : 'Tắt',
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isSharing ? Icons.location_on : Icons.location_off,
+                            size: 16,
                             color: isSharing
                                 ? AppColors.online
                                 : AppColors.textTertiary,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 4),
+                          Text(
+                            isSharing ? 'Đang chia sẻ' : 'Tắt',
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: isSharing
+                                  ? AppColors.online
+                                  : AppColors.textTertiary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
               ],
@@ -261,7 +277,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
 
   List<Marker> _buildFriendMarkers(
     Map<String, Map<String, dynamic>> locations,
-    AsyncValue<List<dynamic>> friends,
+    List<UserModel> friendsList,
   ) {
     final markers = <Marker>[];
 
@@ -270,14 +286,15 @@ class _MapScreenState extends ConsumerState<MapScreen>
       final lng = data['longitude'] as double?;
 
       if (lat != null && lng != null) {
+        final friend = _findFriend(userId, friendsList);
         markers.add(
           Marker(
             point: LatLng(lat, lng),
             width: AppSizes.markerSize + 8,
             height: AppSizes.markerSize + 8,
             child: GestureDetector(
-              onTap: () => _showFriendSheet(userId, data),
-              child: _buildFriendMarkerWidget(data),
+              onTap: () => _showFriendSheet(userId, data, friend),
+              child: _buildFriendMarkerWidget(friend),
             ),
           ),
         );
@@ -287,7 +304,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
     return markers;
   }
 
-  Widget _buildFriendMarkerWidget(Map<String, dynamic> data) {
+  Widget _buildFriendMarkerWidget(UserModel? friend) {
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
@@ -300,7 +317,12 @@ class _MapScreenState extends ConsumerState<MapScreen>
           ),
         ],
       ),
-      child: const HaloAvatar(size: AppSizes.markerSize),
+      child: HaloAvatar(
+        imageUrl: friend?.avatarUrl,
+        name: friend?.displayName ?? friend?.username ?? '?',
+        size: AppSizes.markerSize,
+        isOnline: friend?.isOnline ?? false,
+      ),
     );
   }
 
@@ -322,12 +344,12 @@ class _MapScreenState extends ConsumerState<MapScreen>
     );
   }
 
-  void _showFriendSheet(String userId, Map<String, dynamic> data) {
+  void _showFriendSheet(String userId, Map<String, dynamic> data, UserModel? friend) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) =>
-          FriendBottomSheet(userId: userId, locationData: data),
+          FriendBottomSheet(userId: userId, locationData: data, friend: friend),
     );
   }
 }

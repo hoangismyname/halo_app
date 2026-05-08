@@ -7,14 +7,14 @@ part 'auth_provider.g.dart';
 
 /// Watches auth state changes from Supabase
 @riverpod
-Stream<AuthState> authStateChanges(ref) {
+Stream<AuthState> authStateChanges(Ref ref) {
   final repo = ref.watch(authRepositoryProvider);
   return repo.authStateChanges;
 }
 
 /// Current authenticated user
 @riverpod
-User? currentUser(ref) {
+User? currentUser(Ref ref) {
   ref.watch(authStateChangesProvider);
   final repo = ref.watch(authRepositoryProvider);
   return repo.currentUser;
@@ -22,7 +22,7 @@ User? currentUser(ref) {
 
 /// Current user's profile
 @riverpod
-Future<UserModel?> currentProfile(ref) async {
+Future<UserModel?> currentProfile(Ref ref) async {
   ref.watch(authStateChangesProvider);
   final repo = ref.watch(authRepositoryProvider);
   if (!repo.isAuthenticated) return null;
@@ -97,6 +97,6 @@ class AuthNotifier extends _$AuthNotifier {
 
 /// Boolean indicating if user is logged in
 @riverpod
-bool isAuthenticated(ref) {
-  return ref.watch(currentUserProvider) != null;
+bool isAuthenticated(Ref ref) {
+  return ref.watch(currentUserProvider) != null || AuthRepository.isGuestMode;
 }

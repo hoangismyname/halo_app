@@ -126,6 +126,6 @@ class AuthRepository {
 }
 
 @riverpod
-AuthRepository authRepository(ref) {
+AuthRepository authRepository(Ref ref) {
   return AuthRepository(Supabase.instance.client);
 }

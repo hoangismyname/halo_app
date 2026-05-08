@@ -115,6 +115,6 @@ class FriendsRepository {
 }
 
 @riverpod
-FriendsRepository friendsRepository(ref) {
+FriendsRepository friendsRepository(Ref ref) {
   return FriendsRepository(Supabase.instance.client);
 }

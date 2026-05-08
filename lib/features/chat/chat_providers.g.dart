@@ -52,7 +52,54 @@ final class ChatRoomsListProvider
   }
 }
 
-String _$chatRoomsListHash() => r'78295e31b64d9398826e49c99b1e6f4d5d7fdd2a';
+String _$chatRoomsListHash() => r'29668e8ee46602aba6132b94cf86ebf4f51e25ea';
+
+/// List of chat rooms with last message info
+
+@ProviderFor(chatRoomsWithLastMessage)
+final chatRoomsWithLastMessageProvider = ChatRoomsWithLastMessageProvider._();
+
+/// List of chat rooms with last message info
+
+final class ChatRoomsWithLastMessageProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<Map<String, dynamic>>>,
+          List<Map<String, dynamic>>,
+          FutureOr<List<Map<String, dynamic>>>
+        >
+    with
+        $FutureModifier<List<Map<String, dynamic>>>,
+        $FutureProvider<List<Map<String, dynamic>>> {
+  /// List of chat rooms with last message info
+  ChatRoomsWithLastMessageProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'chatRoomsWithLastMessageProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$chatRoomsWithLastMessageHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<List<Map<String, dynamic>>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<Map<String, dynamic>>> create(Ref ref) {
+    return chatRoomsWithLastMessage(ref);
+  }
+}
+
+String _$chatRoomsWithLastMessageHash() =>
+    r'e5397e16ee981cab3d458df63c80e208f35b2000';
 
 /// Stream messages for a specific room
 
@@ -116,7 +163,7 @@ final class MessagesStreamProvider
   }
 }
 
-String _$messagesStreamHash() => r'07f94e18abbba3c0180be4c1658e04c1b9c04a3b';
+String _$messagesStreamHash() => r'2685755e320a82e1d6e9481f02982bab15cb009d';
 
 /// Stream messages for a specific room
 

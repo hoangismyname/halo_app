@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../chat_providers.dart';
+import '../../data/chat_repository.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/chat_input.dart';
 import '../widgets/sticker_picker.dart';
@@ -20,9 +21,39 @@ class ChatRoomScreen extends ConsumerStatefulWidget {
 class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _showStickerPicker = false;
+  String _roomTitle = 'Chat';
 
   String get _currentUserId =>
       Supabase.instance.client.auth.currentUser?.id ?? '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRoomTitle();
+  }
+
+  Future<void> _loadRoomTitle() async {
+    try {
+      final repo = ref.read(chatRepositoryProvider);
+      final members = await repo.getRoomMembers(widget.roomId);
+      for (final member in members) {
+        final userId = member['user_id'] as String?;
+        if (userId != null && userId != _currentUserId) {
+          final profile = member['profiles'] as Map<String, dynamic>?;
+          if (profile != null && mounted) {
+            setState(() {
+              _roomTitle = profile['display_name'] as String? ??
+                  profile['username'] as String? ??
+                  'Chat';
+            });
+          }
+          break;
+        }
+      }
+    } catch (_) {
+      // Keep default title
+    }
+  }
 
   @override
   void dispose() {
@@ -48,6 +79,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
           content: content.trim(),
         );
 
+    ref.invalidate(chatRoomsWithLastMessageProvider);
     _scrollToBottom();
   }
 
@@ -57,6 +89,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
           stickerUrl: stickerUrl,
         );
 
+    ref.invalidate(chatRoomsWithLastMessageProvider);
     setState(() => _showStickerPicker = false);
     _scrollToBottom();
   }
@@ -67,7 +100,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Chat'),
+        title: Text(_roomTitle),
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios, size: 20),
@@ -159,3 +192,4 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     );
   }
 }
+

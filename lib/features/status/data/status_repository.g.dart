@@ -53,4 +53,4 @@ final class StatusRepositoryProvider
   }
 }
 
-String _$statusRepositoryHash() => r'e7b2831179cf0a2197570c1daa4addba430cfaa2';
+String _$statusRepositoryHash() => r'd10b0330043ad0d98919ea5533e8e438376923cd';

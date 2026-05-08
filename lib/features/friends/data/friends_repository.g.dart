@@ -54,4 +54,4 @@ final class FriendsRepositoryProvider
   }
 }
 
-String _$friendsRepositoryHash() => r'5a709d68e67608d197b54cf996f85491049efae9';
+String _$friendsRepositoryHash() => r'e3baad199d49340efe83b9d53a03541e6c46b01b';

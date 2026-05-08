@@ -6,14 +6,14 @@ part 'friends_provider.g.dart';
 
 /// All accepted friends
 @riverpod
-Future<List<UserModel>> friendsList(ref) async {
+Future<List<UserModel>> friendsList(Ref ref) async {
   final repo = ref.watch(friendsRepositoryProvider);
   return repo.getFriends();
 }
 
 /// Pending friend requests
 @riverpod
-Future<List<Map<String, dynamic>>> pendingRequests(ref) async {
+Future<List<Map<String, dynamic>>> pendingRequests(Ref ref) async {
   final repo = ref.watch(friendsRepositoryProvider);
   return repo.getPendingRequests();
 }

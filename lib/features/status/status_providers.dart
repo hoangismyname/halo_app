@@ -5,7 +5,7 @@ part 'status_providers.g.dart';
 
 /// Stream of all user statuses
 @riverpod
-Stream<List<Map<String, dynamic>>> statusesStream(ref) {
+Stream<List<Map<String, dynamic>>> statusesStream(Ref ref) {
   final repo = ref.watch(statusRepositoryProvider);
   return repo.streamStatuses();
 }

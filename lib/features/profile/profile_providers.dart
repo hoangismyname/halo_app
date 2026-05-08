@@ -6,7 +6,7 @@ part 'profile_providers.g.dart';
 
 /// Profile for a specific user
 @riverpod
-Future<UserModel?> userProfile(ref, String userId) async {
+Future<UserModel?> userProfile(Ref ref, String userId) async {
   final repo = ref.watch(profileRepositoryProvider);
   return repo.getProfile(userId);
 }

@@ -6,14 +6,21 @@ part 'chat_providers.g.dart';
 
 /// List of chat rooms
 @riverpod
-Future<List<ChatRoomModel>> chatRoomsList(ref) async {
+Future<List<ChatRoomModel>> chatRoomsList(Ref ref) async {
   final repo = ref.watch(chatRepositoryProvider);
   return repo.getChatRooms();
 }
 
+/// List of chat rooms with last message info
+@riverpod
+Future<List<Map<String, dynamic>>> chatRoomsWithLastMessage(Ref ref) async {
+  final repo = ref.watch(chatRepositoryProvider);
+  return repo.getChatRoomsWithLastMessage();
+}
+
 /// Stream messages for a specific room
 @riverpod
-Stream<List<Map<String, dynamic>>> messagesStream(ref, String roomId) {
+Stream<List<Map<String, dynamic>>> messagesStream(Ref ref, String roomId) {
   final repo = ref.watch(chatRepositoryProvider);
   return repo.streamMessages(roomId);
 }

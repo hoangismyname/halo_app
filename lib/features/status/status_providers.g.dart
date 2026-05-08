@@ -52,7 +52,7 @@ final class StatusesStreamProvider
   }
 }
 
-String _$statusesStreamHash() => r'772ae174c9e6e8ee3fd4540d08f3511c2c2ebb09';
+String _$statusesStreamHash() => r'9b0e98a76e05d41291815a20f5c61844666af0d7';
 
 /// Status update notifier
 
