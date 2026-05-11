@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart'
+    hide Position, LocationSettings;
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as geo;
+import 'package:geolocator/geolocator.dart' as geolocator;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/location_repository.dart';
 import '../providers/location_provider.dart';
@@ -12,7 +14,7 @@ import '../../../friends/presentation/providers/friends_provider.dart';
 import '../../../auth/domain/user_model.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
-import '../../../../core/widgets/halo_avatar.dart';
+import '../../../../core/constants/mapbox_constants.dart';
 import '../../widgets/friend_bottom_sheet.dart';
 import '../../widgets/map_controls.dart';
 
@@ -23,12 +25,19 @@ class MapScreen extends ConsumerStatefulWidget {
   ConsumerState<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends ConsumerState<MapScreen>
-    with TickerProviderStateMixin {
-  final MapController _mapController = MapController();
-  LatLng _center = const LatLng(10.8231, 106.6297); // Default: Ho Chi Minh City
-  LatLng? _myLocation;
-  StreamSubscription<Position>? _positionStream;
+class _MapScreenState extends ConsumerState<MapScreen> {
+  MapboxMap? _mapboxMap;
+  PointAnnotationManager? _annotationManager;
+  geo.Point? _myLocationPoint;
+  Uint8List? _myLocationIconBytes;
+  final Map<String, Uint8List> _friendIconBytes = {};
+  final Map<String, PointAnnotation> _friendAnnotations = {};
+  double _currentZoom = 13;
+  StreamSubscription<geolocator.Position>? _positionStream;
+  Cancelable? _tapCancelable;
+
+  geo.Point _defaultCenter() =>
+      geo.Point(coordinates: geo.Position(106.6297, 10.8231));
 
   @override
   void initState() {
@@ -37,71 +46,88 @@ class _MapScreenState extends ConsumerState<MapScreen>
   }
 
   Future<void> _initLocation() async {
-    // Load last known location from cache
     final prefs = await SharedPreferences.getInstance();
     final lat = prefs.getDouble('last_lat');
     final lng = prefs.getDouble('last_lng');
-    
+
     if (lat != null && lng != null && mounted) {
       setState(() {
-        _myLocation = LatLng(lat, lng);
-        _center = _myLocation!;
+        _myLocationPoint = geo.Point(coordinates: geo.Position(lng, lat));
       });
     }
 
     if (!kIsWeb) {
       ref.read(locationSharingProvider.notifier).start();
-      
+
       final repo = ref.read(locationRepositoryProvider);
       final hasPerm = await repo.checkPermissions();
-      
+
       if (hasPerm) {
-        // Fallback to geolocator's last known if cache is empty
         if (lat == null) {
-          final lastKnown = await Geolocator.getLastKnownPosition();
+          final lastKnown = await geolocator.Geolocator.getLastKnownPosition();
           if (lastKnown != null && mounted) {
             setState(() {
-              _myLocation = LatLng(lastKnown.latitude, lastKnown.longitude);
-              _center = _myLocation!;
+              _myLocationPoint = geo.Point(
+                coordinates: geo.Position(
+                  lastKnown.longitude,
+                  lastKnown.latitude,
+                ),
+              );
             });
-            _mapController.move(_center, 15);
+            if (_mapboxMap != null) _flyToMyLocation();
           }
         }
-        
-        // Listen to real-time updates
-        _positionStream = Geolocator.getPositionStream(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high, 
-            distanceFilter: 10,
-          ),
-        ).listen((pos) {
-          if (mounted) {
-            setState(() {
-              _myLocation = LatLng(pos.latitude, pos.longitude);
+
+        _positionStream =
+            geolocator.Geolocator.getPositionStream(
+              locationSettings: const geolocator.LocationSettings(
+                accuracy: geolocator.LocationAccuracy.high,
+                distanceFilter: 10,
+              ),
+            ).listen((pos) {
+              if (mounted) {
+                setState(() {
+                  _myLocationPoint = geo.Point(
+                    coordinates: geo.Position(pos.longitude, pos.latitude),
+                  );
+                });
+                prefs.setDouble('last_lat', pos.latitude);
+                prefs.setDouble('last_lng', pos.longitude);
+                _updateMyLocationAnnotation();
+              }
             });
-            prefs.setDouble('last_lat', pos.latitude);
-            prefs.setDouble('last_lng', pos.longitude);
-          }
-        });
       }
     }
   }
 
-  void _centerOnMe() {
-    if (_myLocation != null) {
-      _mapController.move(_myLocation!, 15);
-    } else {
-      _mapController.move(_center, 15);
-    }
+  void _flyToMyLocation() {
+    if (_mapboxMap == null) return;
+    final target = _myLocationPoint ?? _defaultCenter();
+    _mapboxMap!.flyTo(
+      CameraOptions(center: target, zoom: 15),
+      MapAnimationOptions(duration: 1000),
+    );
+  }
+
+  void _zoomIn() {
+    if (_mapboxMap == null) return;
+    _mapboxMap!.setCamera(CameraOptions(zoom: _currentZoom + 1));
+    _currentZoom += 1;
+  }
+
+  void _zoomOut() {
+    if (_mapboxMap == null) return;
+    _mapboxMap!.setCamera(CameraOptions(zoom: _currentZoom - 1));
+    _currentZoom -= 1;
   }
 
   @override
   void dispose() {
     _positionStream?.cancel();
+    _tapCancelable?.cancel();
     super.dispose();
   }
 
-  /// Find a friend's UserModel by userId from the friends list
   UserModel? _findFriend(String userId, List<UserModel> friendsList) {
     try {
       return friendsList.firstWhere((f) => f.id == userId);
@@ -110,55 +136,336 @@ class _MapScreenState extends ConsumerState<MapScreen>
     }
   }
 
+  Future<Uint8List> _createMyLocationIconBytes() async {
+    const size = 96;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final center = Offset(size / 2, size / 2);
+    final radius = size / 2 - 8;
+
+    canvas.drawCircle(
+      center,
+      radius + 10,
+      Paint()
+        ..color = AppColors.mapMarkerSelf.withValues(alpha: 0.3)
+        ..style = PaintingStyle.fill,
+    );
+
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..color = AppColors.mapMarkerSelf
+        ..style = PaintingStyle.fill,
+    );
+
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4,
+    );
+
+    final iconPainter = TextPainter(
+      text: TextSpan(
+        text: String.fromCharCode(Icons.person.codePoint),
+        style: const TextStyle(
+          fontFamily: 'MaterialIcons',
+          fontSize: 32,
+          color: Colors.white,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    iconPainter.layout();
+    iconPainter.paint(
+      canvas,
+      Offset(
+        center.dx - iconPainter.width / 2,
+        center.dy - iconPainter.height / 2,
+      ),
+    );
+
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(size, size);
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    return byteData!.buffer.asUint8List();
+  }
+
+  Future<Uint8List> _createFriendIconBytes(UserModel? friend) async {
+    const size = 112;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final center = Offset(size / 2, size / 2);
+    final radius = size / 2 - 8;
+
+    canvas.drawCircle(
+      center,
+      radius + 8,
+      Paint()
+        ..color = AppColors.primary.withValues(alpha: 0.3)
+        ..style = PaintingStyle.fill,
+    );
+
+    canvas.drawCircle(
+      center,
+      radius + 4,
+      Paint()
+        ..color = AppColors.primary
+        ..style = PaintingStyle.fill,
+    );
+
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..color = AppColors.surface
+        ..style = PaintingStyle.fill,
+    );
+
+    canvas.save();
+    canvas.clipPath(
+      Path()..addOval(Rect.fromCircle(center: center, radius: radius)),
+    );
+
+    final imageUrl = friend?.avatarUrl;
+    bool drewImage = false;
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      try {
+        final imageProvider = NetworkImage(imageUrl);
+        final completer = Completer<ImageInfo>();
+        imageProvider
+            .resolve(ImageConfiguration.empty)
+            .addListener(
+              ImageStreamListener((info, _) {
+                if (!completer.isCompleted) completer.complete(info);
+              }),
+            );
+        final imageInfo = await completer.future.timeout(
+          const Duration(seconds: 2),
+          onTimeout: () => throw TimeoutException('Image load timeout'),
+        );
+
+        canvas.drawImageRect(
+          imageInfo.image,
+          Rect.fromLTWH(
+            0,
+            0,
+            imageInfo.image.width.toDouble(),
+            imageInfo.image.height.toDouble(),
+          ),
+          Rect.fromCircle(center: center, radius: radius),
+          Paint(),
+        );
+        drewImage = true;
+      } catch (_) {
+        // Fallback to initial
+      }
+    }
+
+    if (!drewImage) {
+      final initial =
+          (friend?.displayName.isNotEmpty == true
+                  ? friend!.displayName
+                  : friend?.username ?? '?')
+              .substring(0, 1)
+              .toUpperCase();
+
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: initial,
+          style: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: AppColors.primary,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      textPainter.layout();
+      textPainter.paint(
+        canvas,
+        Offset(
+          center.dx - textPainter.width / 2,
+          center.dy - textPainter.height / 2,
+        ),
+      );
+    }
+
+    canvas.restore();
+
+    if (friend?.isOnline ?? false) {
+      final indicatorPos = Offset(
+        center.dx + radius - 2,
+        center.dy - radius + 2,
+      );
+      canvas.drawCircle(
+        indicatorPos,
+        7,
+        Paint()
+          ..color = AppColors.online
+          ..style = PaintingStyle.fill,
+      );
+      canvas.drawCircle(
+        indicatorPos,
+        7,
+        Paint()
+          ..color = AppColors.surface
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2,
+      );
+    }
+
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(size, size);
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    return byteData!.buffer.asUint8List();
+  }
+
+  Future<void> _onMapCreated(MapboxMap mapboxMap) async {
+    _mapboxMap = mapboxMap;
+    _annotationManager = await mapboxMap.annotations
+        .createPointAnnotationManager();
+
+    // Set up tap listener for friend annotations
+    _tapCancelable = _annotationManager!.tapEvents(onTap: _onAnnotationTap);
+
+    // Create my location icon and annotation
+    if (!kIsWeb && _myLocationPoint != null) {
+      _myLocationIconBytes = await _createMyLocationIconBytes();
+      await _annotationManager!.create(
+        PointAnnotationOptions(
+          geometry: _myLocationPoint!,
+          image: _myLocationIconBytes,
+          iconSize: 1.0,
+          iconAnchor: IconAnchor.CENTER,
+        ),
+      );
+    }
+  }
+
+  void _onAnnotationTap(PointAnnotation annotation) {
+    final textField = annotation.textField;
+    if (textField != null && textField.startsWith('friend_')) {
+      final userId = textField.replaceFirst('friend_', '');
+      final friendLocations = ref.read(friendLocationsProvider);
+      final locationData = friendLocations[userId];
+      final friendsAsync = ref.read(friendsListProvider);
+      final friendsList = friendsAsync.value ?? [];
+      final friend = _findFriend(userId, friendsList);
+      if (locationData != null) {
+        _showFriendSheet(userId, locationData, friend);
+      }
+    }
+  }
+
+  Future<void> _updateMyLocationAnnotation() async {
+    if (_myLocationPoint == null ||
+        _annotationManager == null ||
+        _myLocationIconBytes == null) {
+      return;
+    }
+
+    // Delete old my location annotation and recreate at new position
+    final existing = await _annotationManager!.getAnnotations();
+    for (final annotation in existing) {
+      if (annotation.textField == 'my_location') {
+        await _annotationManager!.delete(annotation);
+        break;
+      }
+    }
+
+    await _annotationManager!.create(
+      PointAnnotationOptions(
+        geometry: _myLocationPoint!,
+        image: _myLocationIconBytes,
+        iconSize: 1.0,
+        iconAnchor: IconAnchor.CENTER,
+        textField: 'my_location',
+      ),
+    );
+  }
+
+  Future<void> _reloadFriendAnnotations() async {
+    if (_annotationManager == null) return;
+
+    final friendLocations = ref.read(friendLocationsProvider);
+    final friendsAsync = ref.read(friendsListProvider);
+    final friendsList = friendsAsync.value ?? [];
+
+    // Delete existing friend annotations
+    final existing = await _annotationManager!.getAnnotations();
+    for (final annotation in existing) {
+      final textField = annotation.textField;
+      if (textField != null &&
+          textField.startsWith('friend_') &&
+          textField != 'my_location') {
+        await _annotationManager!.delete(annotation);
+      }
+    }
+    _friendAnnotations.clear();
+
+    // Create new friend annotations
+    final optionsList = <PointAnnotationOptions>[];
+    final userIds = <String>[];
+
+    for (final entry in friendLocations.entries) {
+      final userId = entry.key;
+      final data = entry.value;
+      final lat = data['latitude'] as double?;
+      final lng = data['longitude'] as double?;
+      if (lat != null && lng != null) {
+        final friend = _findFriend(userId, friendsList);
+        final iconBytes =
+            _friendIconBytes[userId] ?? await _createFriendIconBytes(friend);
+        _friendIconBytes[userId] = iconBytes;
+
+        optionsList.add(
+          PointAnnotationOptions(
+            geometry: geo.Point(coordinates: geo.Position(lng, lat)),
+            image: iconBytes,
+            textField: 'friend_$userId',
+            iconSize: 1.0,
+            iconAnchor: IconAnchor.CENTER,
+          ),
+        );
+        userIds.add(userId);
+      }
+    }
+
+    if (optionsList.isNotEmpty) {
+      final annotations = await _annotationManager!.createMulti(optionsList);
+      for (int i = 0; i < userIds.length; i++) {
+        if (i < annotations.length && annotations[i] != null) {
+          _friendAnnotations[userIds[i]] = annotations[i]!;
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final friendLocations = ref.watch(friendLocationsProvider);
-    final friendsAsync = ref.watch(friendsListProvider);
     final isSharing = ref.watch(locationSharingProvider);
 
-    // Extract friends list safely
-    final friendsList = friendsAsync.value ?? [];
+    ref.listen<Map<String, Map<String, dynamic>>>(friendLocationsProvider, (
+      previous,
+      next,
+    ) {
+      if (previous != next) {
+        _reloadFriendAnnotations();
+      }
+    });
 
     return Scaffold(
       body: Stack(
         children: [
-          // Map
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _center,
-              initialZoom: 13,
-              minZoom: 3,
-              maxZoom: 18,
-              backgroundColor: AppColors.background,
-            ),
-            children: [
-              TileLayer(
-                urlTemplate:
-                    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-                subdomains: const ['a', 'b', 'c', 'd'],
-                userAgentPackageName: 'com.halo.app',
-                retinaMode: true,
-              ),
-
-              // Friend markers
-              MarkerLayer(
-                markers: _buildFriendMarkers(friendLocations, friendsList),
-              ),
-
-              // My location marker
-              if (!kIsWeb && _myLocation != null)
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: _myLocation!,
-                      width: AppSizes.markerSize + 16,
-                      height: AppSizes.markerSize + 16,
-                      child: _buildMyMarker(),
-                    ),
-                  ],
-                ),
-            ],
+          MapWidget(
+            key: const ValueKey('halo_map'),
+            onMapCreated: _onMapCreated,
+            styleUri: MapboxConstants.darkStyleUrl,
           ),
 
           // Top gradient overlay
@@ -189,7 +496,6 @@ class _MapScreenState extends ConsumerState<MapScreen>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // App title
                 ShaderMask(
                   shaderCallback: (bounds) =>
                       AppColors.primaryGradient.createShader(bounds),
@@ -204,10 +510,10 @@ class _MapScreenState extends ConsumerState<MapScreen>
                   ),
                 ),
 
-                // Location sharing toggle
                 if (!kIsWeb)
                   GestureDetector(
-                    onTap: () => ref.read(locationSharingProvider.notifier).toggle(),
+                    onTap: () =>
+                        ref.read(locationSharingProvider.notifier).toggle(),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -254,20 +560,13 @@ class _MapScreenState extends ConsumerState<MapScreen>
             ),
           ),
 
-          // Map controls
           Positioned(
             right: AppSizes.md,
             bottom: AppSizes.xxl + 80,
             child: MapControls(
-              onMyLocation: _centerOnMe,
-              onZoomIn: () => _mapController.move(
-                _mapController.camera.center,
-                _mapController.camera.zoom + 1,
-              ),
-              onZoomOut: () => _mapController.move(
-                _mapController.camera.center,
-                _mapController.camera.zoom - 1,
-              ),
+              onMyLocation: _flyToMyLocation,
+              onZoomIn: _zoomIn,
+              onZoomOut: _zoomOut,
             ),
           ),
         ],
@@ -275,76 +574,11 @@ class _MapScreenState extends ConsumerState<MapScreen>
     );
   }
 
-  List<Marker> _buildFriendMarkers(
-    Map<String, Map<String, dynamic>> locations,
-    List<UserModel> friendsList,
+  void _showFriendSheet(
+    String userId,
+    Map<String, dynamic> data,
+    UserModel? friend,
   ) {
-    final markers = <Marker>[];
-
-    locations.forEach((userId, data) {
-      final lat = data['latitude'] as double?;
-      final lng = data['longitude'] as double?;
-
-      if (lat != null && lng != null) {
-        final friend = _findFriend(userId, friendsList);
-        markers.add(
-          Marker(
-            point: LatLng(lat, lng),
-            width: AppSizes.markerSize + 8,
-            height: AppSizes.markerSize + 8,
-            child: GestureDetector(
-              onTap: () => _showFriendSheet(userId, data, friend),
-              child: _buildFriendMarkerWidget(friend),
-            ),
-          ),
-        );
-      }
-    });
-
-    return markers;
-  }
-
-  Widget _buildFriendMarkerWidget(UserModel? friend) {
-    return Container(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.primary, width: 3),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.4),
-            blurRadius: 10,
-            spreadRadius: 2,
-          ),
-        ],
-      ),
-      child: HaloAvatar(
-        imageUrl: friend?.avatarUrl,
-        name: friend?.displayName ?? friend?.username ?? '?',
-        size: AppSizes.markerSize,
-        isOnline: friend?.isOnline ?? false,
-      ),
-    );
-  }
-
-  Widget _buildMyMarker() {
-    return Container(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: AppColors.mapMarkerSelf,
-        border: Border.all(color: Colors.white, width: 3),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.mapMarkerSelf.withValues(alpha: 0.5),
-            blurRadius: 12,
-            spreadRadius: 3,
-          ),
-        ],
-      ),
-      child: const Icon(Icons.person, color: Colors.white, size: 24),
-    );
-  }
-
-  void _showFriendSheet(String userId, Map<String, dynamic> data, UserModel? friend) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
