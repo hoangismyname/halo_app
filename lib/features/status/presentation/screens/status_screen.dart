@@ -37,9 +37,11 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
       body: statusesAsync.when(
         data: (statuses) {
           final filtered = statuses
-              .where((s) =>
-                  (s['status_text'] as String?)?.isNotEmpty == true ||
-                  (s['status_emoji'] as String?)?.isNotEmpty == true)
+              .where(
+                (s) =>
+                    (s['status_text'] as String?)?.isNotEmpty == true ||
+                    (s['status_emoji'] as String?)?.isNotEmpty == true,
+              )
               .toList();
 
           if (filtered.isEmpty) {
@@ -89,8 +91,10 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
           child: CircularProgressIndicator(color: AppColors.primary),
         ),
         error: (error, _) => Center(
-          child: Text('Lỗi: $error',
-              style: const TextStyle(color: AppColors.error)),
+          child: Text(
+            'Lỗi: $error',
+            style: const TextStyle(color: AppColors.error),
+          ),
         ),
       ),
     );
@@ -99,8 +103,22 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
   void _showUpdateStatusDialog() {
     final textController = TextEditingController();
     final commonEmojis = [
-      '😊', '😎', '🔥', '💪', '🎮', '📚', '🏃', '💤',
-      '🎵', '🍕', '☕', '✈️', '🏠', '💼', '🎉', '❤️',
+      '😊',
+      '😎',
+      '🔥',
+      '💪',
+      '🎮',
+      '📚',
+      '🏃',
+      '💤',
+      '🎵',
+      '🍕',
+      '☕',
+      '✈️',
+      '🏠',
+      '💼',
+      '🎉',
+      '❤️',
     ];
     String selectedEmoji = '😊';
 
@@ -162,8 +180,10 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
                             : null,
                       ),
                       child: Center(
-                        child:
-                            Text(emoji, style: const TextStyle(fontSize: 24)),
+                        child: Text(
+                          emoji,
+                          style: const TextStyle(fontSize: 24),
+                        ),
                       ),
                     ),
                   );
@@ -174,7 +194,9 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
                 controller: textController,
                 maxLength: 100,
                 style: const TextStyle(
-                    fontFamily: 'Inter', color: AppColors.textPrimary),
+                  fontFamily: 'Inter',
+                  color: AppColors.textPrimary,
+                ),
                 cursorColor: AppColors.primary,
                 decoration: InputDecoration(
                   hintText: 'Bạn đang làm gì?',
@@ -187,8 +209,10 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                        const BorderSide(color: AppColors.primary, width: 2),
+                    borderSide: const BorderSide(
+                      color: AppColors.primary,
+                      width: 2,
+                    ),
                   ),
                 ),
               ),
@@ -197,14 +221,29 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
                 width: double.infinity,
                 height: 48,
                 child: ElevatedButton(
+                  // FIXME: Cannot use the Ref of statusProvider after it has been disposed.
                   onPressed: () async {
-                    await ref
+                    final result = await ref
                         .read(statusProvider.notifier)
                         .updateStatus(
                           emoji: selectedEmoji,
                           text: textController.text.trim(),
                         );
-                    if (context.mounted) Navigator.pop(context);
+
+                    if (!context.mounted) return;
+
+                    if (result.success) {
+                      Navigator.pop(context);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            result.errorMessage ?? 'Cập nhật thất bại',
+                          ),
+                          backgroundColor: AppColors.error,
+                        ),
+                      );
+                    }
                   },
                   child: const Text('Lưu trạng thái'),
                 ),
@@ -225,7 +264,8 @@ class _StatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final emoji = status['status_emoji'] as String? ?? '😊';
     final text = status['status_text'] as String? ?? '';
-    final name = status['display_name'] as String? ??
+    final name =
+        status['display_name'] as String? ??
         status['username'] as String? ??
         'Unknown';
     final avatarUrl = status['avatar_url'] as String?;

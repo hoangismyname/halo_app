@@ -8,18 +8,18 @@ part of 'auth_provider.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Watches auth state changes from Supabase
+/// Watches auth state changes from Supabase.
 
 @ProviderFor(authStateChanges)
 final authStateChangesProvider = AuthStateChangesProvider._();
 
-/// Watches auth state changes from Supabase
+/// Watches auth state changes from Supabase.
 
 final class AuthStateChangesProvider
     extends
         $FunctionalProvider<AsyncValue<AuthState>, AuthState, Stream<AuthState>>
     with $FutureModifier<AuthState>, $StreamProvider<AuthState> {
-  /// Watches auth state changes from Supabase
+  /// Watches auth state changes from Supabase.
   AuthStateChangesProvider._()
     : super(
         from: null,
@@ -47,16 +47,16 @@ final class AuthStateChangesProvider
 
 String _$authStateChangesHash() => r'084fabfae7a75366baf1801faab341eba4ef1545';
 
-/// Current authenticated user
+/// Current authenticated Supabase user.
 
 @ProviderFor(currentUser)
 final currentUserProvider = CurrentUserProvider._();
 
-/// Current authenticated user
+/// Current authenticated Supabase user.
 
 final class CurrentUserProvider extends $FunctionalProvider<User?, User?, User?>
     with $Provider<User?> {
-  /// Current authenticated user
+  /// Current authenticated Supabase user.
   CurrentUserProvider._()
     : super(
         from: null,
@@ -92,12 +92,12 @@ final class CurrentUserProvider extends $FunctionalProvider<User?, User?, User?>
 
 String _$currentUserHash() => r'645e80758f77ee9cf155850d553e1050dff412b0';
 
-/// Current user's profile
+/// Current user's profile from the `profiles` table.
 
 @ProviderFor(currentProfile)
 final currentProfileProvider = CurrentProfileProvider._();
 
-/// Current user's profile
+/// Current user's profile from the `profiles` table.
 
 final class CurrentProfileProvider
     extends
@@ -107,7 +107,7 @@ final class CurrentProfileProvider
           FutureOr<UserModel?>
         >
     with $FutureModifier<UserModel?>, $FutureProvider<UserModel?> {
-  /// Current user's profile
+  /// Current user's profile from the `profiles` table.
   CurrentProfileProvider._()
     : super(
         from: null,
@@ -135,15 +135,15 @@ final class CurrentProfileProvider
 
 String _$currentProfileHash() => r'f0b6158f86acb6d00db0d210c023816588115348';
 
-/// Auth notifier for login/signup/logout actions
+/// Auth notifier for login, signup, and logout actions.
 
 @ProviderFor(AuthNotifier)
 final authProvider = AuthNotifierProvider._();
 
-/// Auth notifier for login/signup/logout actions
+/// Auth notifier for login, signup, and logout actions.
 final class AuthNotifierProvider
     extends $AsyncNotifierProvider<AuthNotifier, void> {
-  /// Auth notifier for login/signup/logout actions
+  /// Auth notifier for login, signup, and logout actions.
   AuthNotifierProvider._()
     : super(
         from: null,
@@ -163,9 +163,9 @@ final class AuthNotifierProvider
   AuthNotifier create() => AuthNotifier();
 }
 
-String _$authNotifierHash() => r'0bb500c1fade5c212345452a914ea6c474a4accd';
+String _$authNotifierHash() => r'c976ef8defa87b622062029e71f19d52f4283490';
 
-/// Auth notifier for login/signup/logout actions
+/// Auth notifier for login, signup, and logout actions.
 
 abstract class _$AuthNotifier extends $AsyncNotifier<void> {
   FutureOr<void> build();
@@ -185,17 +185,17 @@ abstract class _$AuthNotifier extends $AsyncNotifier<void> {
   }
 }
 
-/// Boolean indicating if user is logged in
+/// Whether the user is currently authenticated with Supabase.
 
 @ProviderFor(isAuthenticated)
 final isAuthenticatedProvider = IsAuthenticatedProvider._();
 
-/// Boolean indicating if user is logged in
+/// Whether the user is currently authenticated with Supabase.
 
 final class IsAuthenticatedProvider
     extends $FunctionalProvider<bool, bool, bool>
     with $Provider<bool> {
-  /// Boolean indicating if user is logged in
+  /// Whether the user is currently authenticated with Supabase.
   IsAuthenticatedProvider._()
     : super(
         from: null,
@@ -229,4 +229,4 @@ final class IsAuthenticatedProvider
   }
 }
 
-String _$isAuthenticatedHash() => r'b47866aaca90e2f9c9bec0d7eedd2b1aa5d4e8d5';
+String _$isAuthenticatedHash() => r'54fa2e7165f29e09a4d03d1f0bf7ae0df72cf5dc';

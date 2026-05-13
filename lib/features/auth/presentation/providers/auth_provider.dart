@@ -5,14 +5,14 @@ import '../../domain/user_model.dart';
 
 part 'auth_provider.g.dart';
 
-/// Watches auth state changes from Supabase
+/// Watches auth state changes from Supabase.
 @riverpod
 Stream<AuthState> authStateChanges(Ref ref) {
   final repo = ref.watch(authRepositoryProvider);
   return repo.authStateChanges;
 }
 
-/// Current authenticated user
+/// Current authenticated Supabase user.
 @riverpod
 User? currentUser(Ref ref) {
   ref.watch(authStateChangesProvider);
@@ -20,7 +20,7 @@ User? currentUser(Ref ref) {
   return repo.currentUser;
 }
 
-/// Current user's profile
+/// Current user's profile from the `profiles` table.
 @riverpod
 Future<UserModel?> currentProfile(Ref ref) async {
   ref.watch(authStateChangesProvider);
@@ -29,12 +29,13 @@ Future<UserModel?> currentProfile(Ref ref) async {
   return repo.getMyProfile();
 }
 
-/// Auth notifier for login/signup/logout actions
+/// Auth notifier for login, signup, and logout actions.
 @riverpod
 class AuthNotifier extends _$AuthNotifier {
   @override
   FutureOr<void> build() {}
 
+  /// Register a new account. Returns true on success.
   Future<bool> signUp({
     required String email,
     required String password,
@@ -54,10 +55,8 @@ class AuthNotifier extends _$AuthNotifier {
     return !state.hasError;
   }
 
-  Future<bool> signIn({
-    required String email,
-    required String password,
-  }) async {
+  /// Sign in with email and password. Returns true on success.
+  Future<bool> signIn({required String email, required String password}) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final repo = ref.read(authRepositoryProvider);
@@ -66,37 +65,29 @@ class AuthNotifier extends _$AuthNotifier {
     return !state.hasError;
   }
 
+  /// Sign out the current user and invalidate auth providers.
   Future<void> signOut() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final repo = ref.read(authRepositoryProvider);
       await repo.signOut();
-      AuthRepository.isGuestMode = false;
       ref.invalidate(authStateChangesProvider);
     });
   }
 
-  Future<void> signInAsGuest() async {
-    state = const AsyncLoading();
-    AuthRepository.isGuestMode = true;
-    ref.invalidate(authStateChangesProvider);
-    state = const AsyncData(null);
-  }
-
+  /// Human-readable error message from the last failed operation.
   String? get errorMessage {
     if (state.hasError) {
       final error = state.error;
-      if (error is AuthException) {
-        return error.message;
-      }
+      if (error is AuthException) return error.message;
       return error.toString();
     }
     return null;
   }
 }
 
-/// Boolean indicating if user is logged in
+/// Whether the user is currently authenticated with Supabase.
 @riverpod
 bool isAuthenticated(Ref ref) {
-  return ref.watch(currentUserProvider) != null || AuthRepository.isGuestMode;
+  return ref.watch(currentUserProvider) != null;
 }

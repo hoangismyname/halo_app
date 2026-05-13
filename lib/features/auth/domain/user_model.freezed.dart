@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$UserModel {
 
- String get id; String get username; String get displayName; String? get avatarUrl; String get bio; String get statusEmoji; String get statusText; double? get latitude; double? get longitude; DateTime? get locationUpdatedAt; bool get isOnline; DateTime? get lastSeen; DateTime? get createdAt; DateTime? get updatedAt;
+ String get id; String get username;@JsonKey(name: 'display_name') String get displayName;@JsonKey(name: 'avatar_url') String? get avatarUrl; String get bio;@JsonKey(name: 'status_emoji') String get statusEmoji;@JsonKey(name: 'status_text') String get statusText; double? get latitude; double? get longitude;@JsonKey(name: 'location_updated_at') DateTime? get locationUpdatedAt;@JsonKey(name: 'is_online') bool get isOnline;@JsonKey(name: 'last_seen') DateTime? get lastSeen;@JsonKey(name: 'created_at') DateTime? get createdAt;@JsonKey(name: 'updated_at') DateTime? get updatedAt;
 /// Create a copy of UserModel
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -48,7 +48,7 @@ abstract mixin class $UserModelCopyWith<$Res>  {
   factory $UserModelCopyWith(UserModel value, $Res Function(UserModel) _then) = _$UserModelCopyWithImpl;
 @useResult
 $Res call({
- String id, String username, String displayName, String? avatarUrl, String bio, String statusEmoji, String statusText, double? latitude, double? longitude, DateTime? locationUpdatedAt, bool isOnline, DateTime? lastSeen, DateTime? createdAt, DateTime? updatedAt
+ String id, String username,@JsonKey(name: 'display_name') String displayName,@JsonKey(name: 'avatar_url') String? avatarUrl, String bio,@JsonKey(name: 'status_emoji') String statusEmoji,@JsonKey(name: 'status_text') String statusText, double? latitude, double? longitude,@JsonKey(name: 'location_updated_at') DateTime? locationUpdatedAt,@JsonKey(name: 'is_online') bool isOnline,@JsonKey(name: 'last_seen') DateTime? lastSeen,@JsonKey(name: 'created_at') DateTime? createdAt,@JsonKey(name: 'updated_at') DateTime? updatedAt
 });
 
 
@@ -166,7 +166,7 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String username,  String displayName,  String? avatarUrl,  String bio,  String statusEmoji,  String statusText,  double? latitude,  double? longitude,  DateTime? locationUpdatedAt,  bool isOnline,  DateTime? lastSeen,  DateTime? createdAt,  DateTime? updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String username, @JsonKey(name: 'display_name')  String displayName, @JsonKey(name: 'avatar_url')  String? avatarUrl,  String bio, @JsonKey(name: 'status_emoji')  String statusEmoji, @JsonKey(name: 'status_text')  String statusText,  double? latitude,  double? longitude, @JsonKey(name: 'location_updated_at')  DateTime? locationUpdatedAt, @JsonKey(name: 'is_online')  bool isOnline, @JsonKey(name: 'last_seen')  DateTime? lastSeen, @JsonKey(name: 'created_at')  DateTime? createdAt, @JsonKey(name: 'updated_at')  DateTime? updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _UserModel() when $default != null:
 return $default(_that.id,_that.username,_that.displayName,_that.avatarUrl,_that.bio,_that.statusEmoji,_that.statusText,_that.latitude,_that.longitude,_that.locationUpdatedAt,_that.isOnline,_that.lastSeen,_that.createdAt,_that.updatedAt);case _:
@@ -187,7 +187,7 @@ return $default(_that.id,_that.username,_that.displayName,_that.avatarUrl,_that.
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String username,  String displayName,  String? avatarUrl,  String bio,  String statusEmoji,  String statusText,  double? latitude,  double? longitude,  DateTime? locationUpdatedAt,  bool isOnline,  DateTime? lastSeen,  DateTime? createdAt,  DateTime? updatedAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String username, @JsonKey(name: 'display_name')  String displayName, @JsonKey(name: 'avatar_url')  String? avatarUrl,  String bio, @JsonKey(name: 'status_emoji')  String statusEmoji, @JsonKey(name: 'status_text')  String statusText,  double? latitude,  double? longitude, @JsonKey(name: 'location_updated_at')  DateTime? locationUpdatedAt, @JsonKey(name: 'is_online')  bool isOnline, @JsonKey(name: 'last_seen')  DateTime? lastSeen, @JsonKey(name: 'created_at')  DateTime? createdAt, @JsonKey(name: 'updated_at')  DateTime? updatedAt)  $default,) {final _that = this;
 switch (_that) {
 case _UserModel():
 return $default(_that.id,_that.username,_that.displayName,_that.avatarUrl,_that.bio,_that.statusEmoji,_that.statusText,_that.latitude,_that.longitude,_that.locationUpdatedAt,_that.isOnline,_that.lastSeen,_that.createdAt,_that.updatedAt);case _:
@@ -207,7 +207,7 @@ return $default(_that.id,_that.username,_that.displayName,_that.avatarUrl,_that.
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String username,  String displayName,  String? avatarUrl,  String bio,  String statusEmoji,  String statusText,  double? latitude,  double? longitude,  DateTime? locationUpdatedAt,  bool isOnline,  DateTime? lastSeen,  DateTime? createdAt,  DateTime? updatedAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String username, @JsonKey(name: 'display_name')  String displayName, @JsonKey(name: 'avatar_url')  String? avatarUrl,  String bio, @JsonKey(name: 'status_emoji')  String statusEmoji, @JsonKey(name: 'status_text')  String statusText,  double? latitude,  double? longitude, @JsonKey(name: 'location_updated_at')  DateTime? locationUpdatedAt, @JsonKey(name: 'is_online')  bool isOnline, @JsonKey(name: 'last_seen')  DateTime? lastSeen, @JsonKey(name: 'created_at')  DateTime? createdAt, @JsonKey(name: 'updated_at')  DateTime? updatedAt)?  $default,) {final _that = this;
 switch (_that) {
 case _UserModel() when $default != null:
 return $default(_that.id,_that.username,_that.displayName,_that.avatarUrl,_that.bio,_that.statusEmoji,_that.statusText,_that.latitude,_that.longitude,_that.locationUpdatedAt,_that.isOnline,_that.lastSeen,_that.createdAt,_that.updatedAt);case _:
@@ -222,23 +222,23 @@ return $default(_that.id,_that.username,_that.displayName,_that.avatarUrl,_that.
 @JsonSerializable()
 
 class _UserModel implements UserModel {
-  const _UserModel({required this.id, required this.username, this.displayName = '', this.avatarUrl, this.bio = '', this.statusEmoji = '😊', this.statusText = '', this.latitude, this.longitude, this.locationUpdatedAt, this.isOnline = false, this.lastSeen, this.createdAt, this.updatedAt});
+  const _UserModel({required this.id, required this.username, @JsonKey(name: 'display_name') this.displayName = '', @JsonKey(name: 'avatar_url') this.avatarUrl, this.bio = '', @JsonKey(name: 'status_emoji') this.statusEmoji = '😊', @JsonKey(name: 'status_text') this.statusText = '', this.latitude, this.longitude, @JsonKey(name: 'location_updated_at') this.locationUpdatedAt, @JsonKey(name: 'is_online') this.isOnline = false, @JsonKey(name: 'last_seen') this.lastSeen, @JsonKey(name: 'created_at') this.createdAt, @JsonKey(name: 'updated_at') this.updatedAt});
   factory _UserModel.fromJson(Map<String, dynamic> json) => _$UserModelFromJson(json);
 
 @override final  String id;
 @override final  String username;
-@override@JsonKey() final  String displayName;
-@override final  String? avatarUrl;
+@override@JsonKey(name: 'display_name') final  String displayName;
+@override@JsonKey(name: 'avatar_url') final  String? avatarUrl;
 @override@JsonKey() final  String bio;
-@override@JsonKey() final  String statusEmoji;
-@override@JsonKey() final  String statusText;
+@override@JsonKey(name: 'status_emoji') final  String statusEmoji;
+@override@JsonKey(name: 'status_text') final  String statusText;
 @override final  double? latitude;
 @override final  double? longitude;
-@override final  DateTime? locationUpdatedAt;
-@override@JsonKey() final  bool isOnline;
-@override final  DateTime? lastSeen;
-@override final  DateTime? createdAt;
-@override final  DateTime? updatedAt;
+@override@JsonKey(name: 'location_updated_at') final  DateTime? locationUpdatedAt;
+@override@JsonKey(name: 'is_online') final  bool isOnline;
+@override@JsonKey(name: 'last_seen') final  DateTime? lastSeen;
+@override@JsonKey(name: 'created_at') final  DateTime? createdAt;
+@override@JsonKey(name: 'updated_at') final  DateTime? updatedAt;
 
 /// Create a copy of UserModel
 /// with the given fields replaced by the non-null parameter values.
@@ -273,7 +273,7 @@ abstract mixin class _$UserModelCopyWith<$Res> implements $UserModelCopyWith<$Re
   factory _$UserModelCopyWith(_UserModel value, $Res Function(_UserModel) _then) = __$UserModelCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String username, String displayName, String? avatarUrl, String bio, String statusEmoji, String statusText, double? latitude, double? longitude, DateTime? locationUpdatedAt, bool isOnline, DateTime? lastSeen, DateTime? createdAt, DateTime? updatedAt
+ String id, String username,@JsonKey(name: 'display_name') String displayName,@JsonKey(name: 'avatar_url') String? avatarUrl, String bio,@JsonKey(name: 'status_emoji') String statusEmoji,@JsonKey(name: 'status_text') String statusText, double? latitude, double? longitude,@JsonKey(name: 'location_updated_at') DateTime? locationUpdatedAt,@JsonKey(name: 'is_online') bool isOnline,@JsonKey(name: 'last_seen') DateTime? lastSeen,@JsonKey(name: 'created_at') DateTime? createdAt,@JsonKey(name: 'updated_at') DateTime? updatedAt
 });
 
 
