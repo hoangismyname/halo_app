@@ -33,10 +33,6 @@ class StatusRepository {
         .eq('id', uid);
   }
 
-  /// Stream all user statuses, excluding the current user.
-  ///
-  /// Returns profiles ordered by most recent update. The UI layer
-  /// filters out entries with empty status text and default emoji.
   Stream<List<Map<String, dynamic>>> streamStatuses() {
     final uid = _userId;
     if (uid == null) {
@@ -45,7 +41,6 @@ class StatusRepository {
     return _client
         .from(SupabaseConstants.profilesTable)
         .stream(primaryKey: ['id'])
-        .neq('id', uid)
         .order('updated_at', ascending: false);
   }
 }

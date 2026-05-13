@@ -1,4 +1,5 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../auth/presentation/providers/auth_provider.dart';
 import 'data/status_repository.dart';
 
 part 'status_providers.g.dart';
@@ -38,21 +39,33 @@ class StatusNotifier extends _$StatusNotifier {
     required String emoji,
     required String text,
   }) async {
-    state = const AsyncLoading();
-    // FIXME: Cannot use the Ref of statusProvider after it has been disposed.
-    state = await AsyncValue.guard(() async {
+    // Keep the provider alive while the async operation is running
+    final link = ref.keepAlive();
+    
+    try {
+      state = const AsyncLoading();
+      
+      // Read dependencies before the async gap
       final repo = ref.read(statusRepositoryProvider);
-      await repo.updateStatus(emoji: emoji, text: text);
-    });
+      
+      state = await AsyncValue.guard(() => repo.updateStatus(emoji: emoji, text: text));
 
-    // Capture the result BEFORE returning — don't let callers
-    // access the provider after the async gap.
-    if (state.hasError) {
-      return StatusUpdateResult(
-        success: false,
-        errorMessage: state.error.toString(),
-      );
+      // Force refresh on profile and status streams to show immediately
+      ref.invalidate(currentProfileProvider);
+      ref.invalidate(statusesStreamProvider);
+
+      // Capture the result BEFORE returning — don't let callers
+      // access the provider after the async gap.
+      if (state.hasError) {
+        return StatusUpdateResult(
+          success: false,
+          errorMessage: state.error.toString(),
+        );
+      }
+      return const StatusUpdateResult(success: true);
+    } finally {
+      // Allow the provider to be disposed again
+      link.close();
     }
-    return const StatusUpdateResult(success: true);
   }
 }

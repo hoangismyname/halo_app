@@ -45,46 +45,64 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
               .toList();
 
           if (filtered.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.mood,
-                    size: 64,
-                    color: AppColors.textTertiary.withValues(alpha: 0.5),
-                  ),
-                  const SizedBox(height: AppSizes.md),
-                  const Text(
-                    'Chưa có trạng thái nào',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textTertiary,
+            return RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(statusesStreamProvider);
+              },
+              child: LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Container(
+                    height: constraints.maxHeight,
+                    alignment: Alignment.center,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.mood,
+                          size: 64,
+                          color: AppColors.textTertiary.withValues(alpha: 0.5),
+                        ),
+                        const SizedBox(height: AppSizes.md),
+                        const Text(
+                          'Chưa có trạng thái nào',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textTertiary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Hãy chia sẻ trạng thái của bạn!',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 14,
+                            color: AppColors.textTertiary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Hãy chia sẻ trạng thái của bạn!',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 14,
-                      color: AppColors.textTertiary,
-                    ),
-                  ),
-                ],
+                ),
               ),
             );
           }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(AppSizes.md),
-            itemCount: filtered.length,
-            itemBuilder: (context, index) {
-              final status = filtered[index];
-              return _StatusCard(status: status);
+          return RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(statusesStreamProvider);
             },
+            child: ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(AppSizes.md),
+              itemCount: filtered.length,
+              itemBuilder: (context, index) {
+                final status = filtered[index];
+                return _StatusCard(status: status);
+              },
+            ),
           );
         },
         loading: () => const Center(
@@ -221,7 +239,6 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
                 width: double.infinity,
                 height: 48,
                 child: ElevatedButton(
-                  // FIXME: Cannot use the Ref of statusProvider after it has been disposed.
                   onPressed: () async {
                     final result = await ref
                         .read(statusProvider.notifier)
