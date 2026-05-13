@@ -100,9 +100,34 @@ class ChatListScreen extends ConsumerWidget {
           child: CircularProgressIndicator(color: AppColors.primary),
         ),
         error: (error, _) => Center(
-          child: Text(
-            'Lỗi tải tin nhắn',
-            style: TextStyle(color: AppColors.error),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: AppColors.error),
+              const SizedBox(height: AppSizes.md),
+              const Text(
+                'Không thể tải tin nhắn',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: AppSizes.sm),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSizes.lg),
+                child: Text(
+                  error.toString(),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -168,7 +193,9 @@ class _ChatRoomTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(
-          horizontal: AppSizes.md, vertical: AppSizes.xs),
+        horizontal: AppSizes.md,
+        vertical: AppSizes.xs,
+      ),
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppSizes.radiusMd),
@@ -176,7 +203,9 @@ class _ChatRoomTile extends StatelessWidget {
       child: ListTile(
         onTap: onTap,
         contentPadding: const EdgeInsets.symmetric(
-            horizontal: AppSizes.md, vertical: AppSizes.xs),
+          horizontal: AppSizes.md,
+          vertical: AppSizes.xs,
+        ),
         leading: HaloAvatar(
           imageUrl: avatarUrl,
           name: name,
@@ -217,8 +246,7 @@ class _ChatRoomTile extends StatelessWidget {
             if (isGroup) ...[
               const SizedBox(height: 4),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: AppColors.secondary.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),

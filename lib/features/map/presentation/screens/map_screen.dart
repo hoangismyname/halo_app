@@ -9,6 +9,7 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart'
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as geo;
 import '../../../friends/presentation/providers/friends_provider.dart';
 import '../../../auth/domain/user_model.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/mapbox_constants.dart';
@@ -273,116 +274,86 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
   }
 
-  Future<Uint8List> _createMyLocationIconBytes() async {
-    const size = 96;
+  // ──────────────────────────── avatar icon rendering ──
+
+  /// Renders a circular avatar icon with optional image, initials fallback,
+  /// online indicator, and colored ring. Returns PNG bytes for Mapbox
+  /// annotations.
+  ///
+  /// [avatarUrl] — optional network image URL for the avatar photo.
+  /// [name] — display name used for the initial letter fallback.
+  /// [accentColor] — ring/border color (cyan for self, primary for friends).
+  /// [isSelf] — if true, draws a solid ring with person icon; otherwise
+  ///   draws an outlined ring with initials inside.
+  /// [showOnlineIndicator] — whether to draw a green dot at top-right.
+  Future<Uint8List> _renderAvatarIcon({
+    String? avatarUrl,
+    required String name,
+    required Color accentColor,
+    bool isSelf = false,
+    bool showOnlineIndicator = false,
+  }) async {
+    const size = 128;
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     final center = Offset(size / 2, size / 2);
-    final radius = size / 2 - 8;
+    final radius = isSelf ? size / 2 - 8 : size / 2 - 10;
 
+    // Outer glow ring
     canvas.drawCircle(
       center,
-      radius + 10,
+      radius + (isSelf ? 10 : 8),
       Paint()
-        ..color = AppColors.mapMarkerSelf.withValues(alpha: 0.3)
+        ..color = accentColor.withValues(alpha: 0.3)
         ..style = PaintingStyle.fill,
     );
 
+    // Solid ring
     canvas.drawCircle(
       center,
-      radius,
+      radius + (isSelf ? 6 : 4),
       Paint()
-        ..color = AppColors.mapMarkerSelf
+        ..color = accentColor
         ..style = PaintingStyle.fill,
     );
 
+    // Inner white border
     canvas.drawCircle(
       center,
       radius,
       Paint()
         ..color = Colors.white
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 4,
+        ..strokeWidth = 3,
     );
 
-    final iconPainter = TextPainter(
-      text: TextSpan(
-        text: String.fromCharCode(Icons.person.codePoint),
-        style: const TextStyle(
-          fontFamily: 'MaterialIcons',
-          fontSize: 32,
-          color: Colors.white,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    );
-    iconPainter.layout();
-    iconPainter.paint(
-      canvas,
-      Offset(
-        center.dx - iconPainter.width / 2,
-        center.dy - iconPainter.height / 2,
-      ),
-    );
-
-    final picture = recorder.endRecording();
-    final image = await picture.toImage(size, size);
-    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-    return byteData!.buffer.asUint8List();
-  }
-
-  Future<Uint8List> _createFriendIconBytes(UserModel? friend) async {
-    const size = 112;
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    final center = Offset(size / 2, size / 2);
-    final radius = size / 2 - 8;
-
-    canvas.drawCircle(
-      center,
-      radius + 8,
-      Paint()
-        ..color = AppColors.primary.withValues(alpha: 0.3)
-        ..style = PaintingStyle.fill,
-    );
-
-    canvas.drawCircle(
-      center,
-      radius + 4,
-      Paint()
-        ..color = AppColors.primary
-        ..style = PaintingStyle.fill,
-    );
-
-    canvas.drawCircle(
-      center,
-      radius,
-      Paint()
-        ..color = AppColors.surface
-        ..style = PaintingStyle.fill,
-    );
-
-    canvas.save();
-    canvas.clipPath(
-      Path()..addOval(Rect.fromCircle(center: center, radius: radius)),
-    );
-
-    final imageUrl = friend?.avatarUrl;
+    // Try to draw avatar image
     bool drewImage = false;
-    if (imageUrl != null && imageUrl.isNotEmpty) {
+    if (avatarUrl != null && avatarUrl.isNotEmpty) {
       try {
-        final imageProvider = NetworkImage(imageUrl);
+        final imageProvider = NetworkImage(avatarUrl);
         final completer = Completer<ImageInfo>();
         imageProvider
             .resolve(ImageConfiguration.empty)
             .addListener(
-              ImageStreamListener((info, _) {
-                if (!completer.isCompleted) completer.complete(info);
-              }),
+              ImageStreamListener(
+                (info, _) {
+                  if (!completer.isCompleted) completer.complete(info);
+                },
+                onError: (error, stackTrace) {
+                  if (!completer.isCompleted) completer.completeError(error);
+                },
+              ),
             );
         final imageInfo = await completer.future.timeout(
-          const Duration(seconds: 2),
+          const Duration(seconds: 3),
           onTimeout: () => throw TimeoutException('Image load timeout'),
+        );
+
+        // Clip to circle
+        canvas.save();
+        canvas.clipPath(
+          Path()..addOval(Rect.fromCircle(center: center, radius: radius)),
         );
 
         canvas.drawImageRect(
@@ -396,33 +367,43 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           Rect.fromCircle(center: center, radius: radius),
           Paint(),
         );
+        canvas.restore();
         drewImage = true;
       } catch (_) {
-        // Fallback to initial
+        // Fall through to initials
       }
     }
 
+    // Fallback: draw initial letter
     if (!drewImage) {
-      final initial =
-          (friend?.displayName.isNotEmpty == true
-                  ? friend!.displayName
-                  : friend?.username ?? '?')
-              .substring(0, 1)
-              .toUpperCase();
+      final initial = (name.isNotEmpty ? name : '?')
+          .substring(0, 1)
+          .toUpperCase();
 
       final textPainter = TextPainter(
         text: TextSpan(
           text: initial,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'Inter',
-            fontSize: 28,
+            fontSize: isSelf ? 32 : 28,
             fontWeight: FontWeight.bold,
-            color: AppColors.primary,
+            color: isSelf ? Colors.white : accentColor,
           ),
         ),
         textDirection: TextDirection.ltr,
       );
       textPainter.layout();
+
+      if (!isSelf) {
+        canvas.drawCircle(
+          center,
+          radius,
+          Paint()
+            ..color = AppColors.surface
+            ..style = PaintingStyle.fill,
+        );
+      }
+
       textPainter.paint(
         canvas,
         Offset(
@@ -430,11 +411,32 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           center.dy - textPainter.height / 2,
         ),
       );
+    } else if (isSelf) {
+      // Draw person icon overlay on top of avatar for self marker
+      final iconPainter = TextPainter(
+        text: TextSpan(
+          text: String.fromCharCode(Icons.person.codePoint),
+          style: const TextStyle(
+            fontFamily: 'MaterialIcons',
+            fontSize: 20,
+            color: Colors.white,
+            shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      iconPainter.layout();
+      iconPainter.paint(
+        canvas,
+        Offset(
+          center.dx - iconPainter.width / 2,
+          center.dy - iconPainter.height / 2,
+        ),
+      );
     }
 
-    canvas.restore();
-
-    if (friend?.isOnline ?? false) {
+    // Online indicator
+    if (showOnlineIndicator) {
       final indicatorPos = Offset(
         center.dx + radius - 2,
         center.dy - radius + 2,
@@ -450,7 +452,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         indicatorPos,
         7,
         Paint()
-          ..color = AppColors.surface
+          ..color = AppColors.background
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2,
       );
@@ -460,6 +462,35 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final image = await picture.toImage(size, size);
     final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
     return byteData!.buffer.asUint8List();
+  }
+
+  /// Creates the user's own location marker icon.
+  /// If the user has an avatar, it's rendered; otherwise a person icon.
+  Future<Uint8List> _createMyLocationIconBytes(UserModel? profile) async {
+    return _renderAvatarIcon(
+      avatarUrl: profile?.avatarUrl,
+      name: profile?.displayName.isNotEmpty == true
+          ? profile!.displayName
+          : profile?.username ?? 'Me',
+      accentColor: AppColors.mapMarkerSelf,
+      isSelf: true,
+    );
+  }
+
+  /// Creates a friend's location marker icon with avatar if available.
+  Future<Uint8List> _createFriendIconBytes(
+    UserModel? friend, {
+    bool showOnline = false,
+  }) async {
+    final name = friend?.displayName.isNotEmpty == true
+        ? friend!.displayName
+        : friend?.username ?? '?';
+    return _renderAvatarIcon(
+      avatarUrl: friend?.avatarUrl,
+      name: name,
+      accentColor: AppColors.primary,
+      showOnlineIndicator: showOnline,
+    );
   }
 
   Future<void> _onMapCreated(MapboxMap mapboxMap) async {
@@ -481,7 +512,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     // Restore my location annotation from the background tracker's position
     final trackerPos = ref.read(locationTrackerProvider);
     if (trackerPos != null && !kIsWeb) {
-      _myLocationIconBytes ??= await _createMyLocationIconBytes();
+      final profile = ref.read(currentProfileProvider).value;
+      _myLocationIconBytes = await _createMyLocationIconBytes(profile);
       _myLocationAnnotation = await _annotationManager!.create(
         PointAnnotationOptions(
           geometry: geo.Point(
@@ -514,11 +546,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   Future<void> _updateMyLocationAnnotation() async {
-    if (_myLocationPoint == null || _annotationManager == null) {
-      return;
-    }
+    if (_myLocationPoint == null || _annotationManager == null) return;
 
-    _myLocationIconBytes ??= await _createMyLocationIconBytes();
+    final profile = ref.read(currentProfileProvider).value;
+    _myLocationIconBytes = await _createMyLocationIconBytes(profile);
 
     if (_myLocationAnnotation != null) {
       _myLocationAnnotation!.geometry = _myLocationPoint!;
@@ -527,7 +558,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       _myLocationAnnotation = await _annotationManager!.create(
         PointAnnotationOptions(
           geometry: _myLocationPoint!,
-          image: _myLocationIconBytes,
+          image: _myLocationIconBytes!,
           iconSize: 1.0,
           iconAnchor: IconAnchor.CENTER,
         ),
@@ -563,8 +594,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       final lng = data['longitude'] as double?;
       if (lat != null && lng != null) {
         final friend = _findFriend(userId, friendsList);
+        final isOnline = friend?.isOnline ?? false;
         final iconBytes =
-            _friendIconBytes[userId] ?? await _createFriendIconBytes(friend);
+            _friendIconBytes[userId] ??
+            await _createFriendIconBytes(friend, showOnline: isOnline);
         _friendIconBytes[userId] = iconBytes;
 
         optionsList.add(

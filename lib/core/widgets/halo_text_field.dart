@@ -39,6 +39,7 @@ class HaloTextField extends StatelessWidget {
     this.enabled = true,
   });
 
+  // TODO: căn đều textfield phần giới thiệu nằm giữa
   @override
   Widget build(BuildContext context) {
     return TextFormField(
@@ -63,7 +64,11 @@ class HaloTextField extends StatelessWidget {
         hintText: hintText,
         labelText: labelText,
         prefixIcon: prefixIcon != null
-            ? Icon(prefixIcon, color: AppColors.textTertiary, size: AppSizes.iconMd)
+            ? Icon(
+                prefixIcon,
+                color: AppColors.textTertiary,
+                size: AppSizes.iconMd,
+              )
             : null,
         suffixIcon: suffixIcon,
         counterText: '',

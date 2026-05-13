@@ -1,3 +1,4 @@
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/constants/supabase_constants.dart';
@@ -7,8 +8,10 @@ part 'profile_repository.g.dart';
 
 class ProfileRepository {
   final SupabaseClient _client;
+  final ImagePicker _picker;
 
-  ProfileRepository(this._client);
+  ProfileRepository(this._client, {ImagePicker? picker})
+    : _picker = picker ?? ImagePicker();
 
   String? get _userId => _client.auth.currentUser?.id;
 
@@ -33,7 +36,7 @@ class ProfileRepository {
     if (_userId == null) return;
 
     final updates = <String, dynamic>{
-      'updated_at': DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
     };
 
     if (displayName != null) updates['display_name'] = displayName;
@@ -46,20 +49,40 @@ class ProfileRepository {
         .eq('id', _userId!);
   }
 
-  /// Upload avatar to Supabase Storage and return public URL
-  Future<String?> uploadAvatar(List<int> fileBytes, String fileName) async {
-    if (_userId == null) return null;
+  /// Pick an image from gallery/camera, upload to Supabase Storage,
+  /// update the profile avatar URL, and return the public URL.
+  ///
+  /// Returns null if the user cancels or if an error occurs.
+  Future<String?> uploadAvatar() async {
+    final uid = _userId;
+    if (uid == null) return null;
 
-    final path = '$_userId/$fileName';
+    // Pick image from gallery
+    final XFile? image = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 80,
+    );
+    if (image == null) return null;
 
+    final bytes = await image.readAsBytes();
+    final ext = image.path.split('.').last.toLowerCase();
+    final fileName = 'avatar.$ext';
+    final storagePath = '$uid/$fileName';
+
+    // Upload to Supabase Storage
     await _client.storage
         .from(SupabaseConstants.avatarsBucket)
-        .uploadBinary(path, fileBytes as dynamic,
-            fileOptions: const FileOptions(upsert: true));
+        .uploadBinary(
+          storagePath,
+          bytes,
+          fileOptions: const FileOptions(upsert: true),
+        );
 
     final url = _client.storage
         .from(SupabaseConstants.avatarsBucket)
-        .getPublicUrl(path);
+        .getPublicUrl(storagePath);
 
     // Update profile with new avatar URL
     await updateProfile(avatarUrl: url);
