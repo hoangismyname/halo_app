@@ -168,25 +168,20 @@ final routerProvider = Provider<GoRouter>((ref) {
       final currentPath = state.matchedLocation;
       final publicPaths = ['/login', '/register', '/splash'];
 
+      // Cho phép SplashScreen tự quyết định thời điểm chuyển hướng
+      if (currentPath == '/splash') {
+        return null;
+      }
+
       // Not logged in: redirect to login unless already on a public page
       if (!isLoggedIn && !publicPaths.contains(currentPath)) {
-        return '/splash';
+        return '/login';
       }
 
       // Logged in and on auth pages: redirect to home
       if (isLoggedIn &&
           (currentPath == '/login' || currentPath == '/register')) {
         return '/';
-      }
-
-      // On splash but logged in: go to home
-      if (isLoggedIn && currentPath == '/splash') {
-        return '/';
-      }
-
-      // On splash but not logged in: go to login
-      if (!isLoggedIn && currentPath == '/splash') {
-        return '/login';
       }
 
       return null;
