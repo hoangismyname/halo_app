@@ -135,7 +135,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 HaloTextField(
                   controller: _bioController,
                   labelText: 'Giới thiệu',
-                  prefixIcon: Icons.info_outline,
                   maxLines: 3,
                   maxLength: 200,
                 ),

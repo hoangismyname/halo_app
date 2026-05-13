@@ -19,6 +19,7 @@ class HaloTextField extends StatelessWidget {
   final bool autofocus;
   final FocusNode? focusNode;
   final bool enabled;
+  final TextAlign textAlign;
 
   const HaloTextField({
     super.key,
@@ -37,9 +38,9 @@ class HaloTextField extends StatelessWidget {
     this.autofocus = false,
     this.focusNode,
     this.enabled = true,
+    this.textAlign = TextAlign.start,
   });
 
-  // TODO: căn đều textfield phần giới thiệu nằm giữa
   @override
   Widget build(BuildContext context) {
     return TextFormField(
@@ -54,6 +55,8 @@ class HaloTextField extends StatelessWidget {
       autofocus: autofocus,
       focusNode: focusNode,
       enabled: enabled,
+      textAlign: textAlign,
+      textAlignVertical: TextAlignVertical.center,
       style: const TextStyle(
         fontFamily: 'Inter',
         fontSize: 15,
