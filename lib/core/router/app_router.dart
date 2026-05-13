@@ -151,18 +151,30 @@ final routerProvider = Provider<GoRouter>((ref) {
   final isLoggedIn = ref.watch(isAuthenticatedProvider);
 
   return GoRouter(
-    initialLocation: '/login',
+    initialLocation: '/splash',
     redirect: (context, state) {
       final currentPath = state.matchedLocation;
       final publicPaths = ['/login', '/register', '/splash'];
 
+      // Not logged in: redirect to login unless already on a public page
       if (!isLoggedIn && !publicPaths.contains(currentPath)) {
-        return '/login';
+        return '/splash';
       }
 
+      // Logged in and on auth pages: redirect to home
       if (isLoggedIn &&
           (currentPath == '/login' || currentPath == '/register')) {
         return '/';
+      }
+
+      // On splash but logged in: go to home
+      if (isLoggedIn && currentPath == '/splash') {
+        return '/';
+      }
+
+      // On splash but not logged in: go to login
+      if (!isLoggedIn && currentPath == '/splash') {
+        return '/login';
       }
 
       return null;
@@ -173,10 +185,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/splash',
         builder: (context, state) => const SplashScreen(),
       ),
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
-      ),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
@@ -189,10 +198,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           return _MainShell(currentIndex: index, child: child);
         },
         routes: [
-          GoRoute(
-            path: '/',
-            builder: (context, state) => const MapScreen(),
-          ),
+          GoRoute(path: '/', builder: (context, state) => const MapScreen()),
           GoRoute(
             path: '/friends',
             builder: (context, state) => const FriendsListScreen(),

@@ -17,6 +17,7 @@ import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/mapbox_constants.dart';
 import '../../widgets/friend_bottom_sheet.dart';
 import '../../widgets/map_controls.dart';
+import '../../../weather/presentation/widgets/weather_overlay.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
@@ -28,6 +29,7 @@ class MapScreen extends ConsumerStatefulWidget {
 class _MapScreenState extends ConsumerState<MapScreen> {
   MapboxMap? _mapboxMap;
   PointAnnotationManager? _annotationManager;
+  PointAnnotation? _myLocationAnnotation;
   geo.Point? _myLocationPoint;
   Uint8List? _myLocationIconBytes;
   final Map<String, Uint8List> _friendIconBytes = {};
@@ -42,7 +44,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   @override
   void initState() {
     super.initState();
-    _initLocation();
+    // Defer location setup to avoid blocking the build phase with permission
+    // requests. This prevents the app from hanging/crashing on first launch.
+    Future.microtask(() => _initLocation());
   }
 
   Future<void> _initLocation() async {
@@ -57,45 +61,50 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
 
     if (!kIsWeb) {
-      ref.read(locationSharingProvider.notifier).start();
+      try {
+        ref.read(locationSharingProvider.notifier).start();
 
-      final repo = ref.read(locationRepositoryProvider);
-      final hasPerm = await repo.checkPermissions();
+        final repo = ref.read(locationRepositoryProvider);
+        final hasPerm = await repo.checkPermissions();
 
-      if (hasPerm) {
-        if (lat == null) {
-          final lastKnown = await geolocator.Geolocator.getLastKnownPosition();
-          if (lastKnown != null && mounted) {
-            setState(() {
-              _myLocationPoint = geo.Point(
-                coordinates: geo.Position(
-                  lastKnown.longitude,
-                  lastKnown.latitude,
-                ),
-              );
-            });
-            if (_mapboxMap != null) _flyToMyLocation();
+        if (hasPerm) {
+          if (lat == null) {
+            final lastKnown =
+                await geolocator.Geolocator.getLastKnownPosition();
+            if (lastKnown != null && mounted) {
+              setState(() {
+                _myLocationPoint = geo.Point(
+                  coordinates: geo.Position(
+                    lastKnown.longitude,
+                    lastKnown.latitude,
+                  ),
+                );
+              });
+              if (_mapboxMap != null) _flyToMyLocation();
+            }
           }
-        }
 
-        _positionStream =
-            geolocator.Geolocator.getPositionStream(
-              locationSettings: const geolocator.LocationSettings(
-                accuracy: geolocator.LocationAccuracy.high,
-                distanceFilter: 10,
-              ),
-            ).listen((pos) {
-              if (mounted) {
-                setState(() {
-                  _myLocationPoint = geo.Point(
-                    coordinates: geo.Position(pos.longitude, pos.latitude),
-                  );
-                });
-                prefs.setDouble('last_lat', pos.latitude);
-                prefs.setDouble('last_lng', pos.longitude);
-                _updateMyLocationAnnotation();
-              }
-            });
+          _positionStream =
+              geolocator.Geolocator.getPositionStream(
+                locationSettings: const geolocator.LocationSettings(
+                  accuracy: geolocator.LocationAccuracy.high,
+                  distanceFilter: 10,
+                ),
+              ).listen((pos) {
+                if (mounted) {
+                  setState(() {
+                    _myLocationPoint = geo.Point(
+                      coordinates: geo.Position(pos.longitude, pos.latitude),
+                    );
+                  });
+                  prefs.setDouble('last_lat', pos.latitude);
+                  prefs.setDouble('last_lng', pos.longitude);
+                  _updateMyLocationAnnotation();
+                }
+              });
+        }
+      } catch (e) {
+        debugPrint('Location init failed: $e');
       }
     }
   }
@@ -334,16 +343,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _tapCancelable = _annotationManager!.tapEvents(onTap: _onAnnotationTap);
 
     // Create my location icon and annotation
-    if (!kIsWeb && _myLocationPoint != null) {
-      _myLocationIconBytes = await _createMyLocationIconBytes();
-      await _annotationManager!.create(
-        PointAnnotationOptions(
-          geometry: _myLocationPoint!,
-          image: _myLocationIconBytes,
-          iconSize: 1.0,
-          iconAnchor: IconAnchor.CENTER,
-        ),
-      );
+    if (!kIsWeb) {
+      _myLocationIconBytes ??= await _createMyLocationIconBytes();
+      if (_myLocationPoint != null) {
+        _myLocationAnnotation = await _annotationManager!.create(
+          PointAnnotationOptions(
+            geometry: _myLocationPoint!,
+            image: _myLocationIconBytes,
+            iconSize: 1.0,
+            iconAnchor: IconAnchor.CENTER,
+          ),
+        );
+      }
     }
   }
 
@@ -363,30 +374,25 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   Future<void> _updateMyLocationAnnotation() async {
-    if (_myLocationPoint == null ||
-        _annotationManager == null ||
-        _myLocationIconBytes == null) {
+    if (_myLocationPoint == null || _annotationManager == null) {
       return;
     }
 
-    // Delete old my location annotation and recreate at new position
-    final existing = await _annotationManager!.getAnnotations();
-    for (final annotation in existing) {
-      if (annotation.textField == 'my_location') {
-        await _annotationManager!.delete(annotation);
-        break;
-      }
-    }
+    _myLocationIconBytes ??= await _createMyLocationIconBytes();
 
-    await _annotationManager!.create(
-      PointAnnotationOptions(
-        geometry: _myLocationPoint!,
-        image: _myLocationIconBytes,
-        iconSize: 1.0,
-        iconAnchor: IconAnchor.CENTER,
-        textField: 'my_location',
-      ),
-    );
+    if (_myLocationAnnotation != null) {
+      _myLocationAnnotation!.geometry = _myLocationPoint!;
+      await _annotationManager!.update(_myLocationAnnotation!);
+    } else {
+      _myLocationAnnotation = await _annotationManager!.create(
+        PointAnnotationOptions(
+          geometry: _myLocationPoint!,
+          image: _myLocationIconBytes,
+          iconSize: 1.0,
+          iconAnchor: IconAnchor.CENTER,
+        ),
+      );
+    }
   }
 
   Future<void> _reloadFriendAnnotations() async {
@@ -400,9 +406,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final existing = await _annotationManager!.getAnnotations();
     for (final annotation in existing) {
       final textField = annotation.textField;
-      if (textField != null &&
-          textField.startsWith('friend_') &&
-          textField != 'my_location') {
+      if (textField != null && textField.startsWith('friend_')) {
         await _annotationManager!.delete(annotation);
       }
     }
@@ -558,6 +562,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   ),
               ],
             ),
+          ),
+
+          // Weather chip — top-right below the top bar
+          Positioned(
+            right: AppSizes.md,
+            top: MediaQuery.paddingOf(context).top + 60,
+            child: const WeatherOverlay(),
           ),
 
           Positioned(

@@ -2,8 +2,11 @@
   "permissions": {
     "allow": [
       "WebFetch(openrouteservice.org)",
-      "WebFetch(openweathermap.org)"
+      "WebFetch(openweathermap.org)",
+      "Bash(flutter *)",
+      "Bash(which *)",
+      "Bash(find *)"
     ]
   },
-  "$version": 3
+  "$version": 4
 }
