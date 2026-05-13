@@ -42,6 +42,7 @@ class ProfileScreen extends ConsumerWidget {
           }
 
           return SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.all(AppSizes.lg),
             child: Column(
               children: [
@@ -194,13 +195,13 @@ class ProfileScreen extends ConsumerWidget {
                       _SettingsTile(
                         icon: Icons.notifications_outlined,
                         title: 'Thông báo',
-                        onTap: () {},
+                        onTap: () => context.push('/notifications'),
                       ),
                       const Divider(height: 1, indent: 56, endIndent: 16),
                       _SettingsTile(
                         icon: Icons.shield_outlined,
                         title: 'Quyền riêng tư',
-                        onTap: () {},
+                        onTap: () => context.push('/privacy'),
                       ),
                     ],
                   ),
@@ -213,7 +214,6 @@ class ProfileScreen extends ConsumerWidget {
                   isLoading: isLoading,
                   onPressed: () async {
                     await ref.read(authProvider.notifier).signOut();
-                    if (context.mounted) context.go('/login');
                   },
                 ),
                 const SizedBox(height: AppSizes.xl),

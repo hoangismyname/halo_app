@@ -13,6 +13,8 @@ import '../../features/chat/presentation/screens/chat_room_screen.dart';
 import '../../features/status/presentation/screens/status_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/profile/presentation/screens/edit_profile_screen.dart';
+import '../../features/profile/presentation/screens/notification_screen.dart';
+import '../../features/profile/presentation/screens/privacy_screen.dart';
 import '../constants/app_colors.dart';
 
 // Shell for main navigation with IndexedStack — keeps all tab screens alive
@@ -237,18 +239,46 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Full-screen routes (no bottom nav)
       GoRoute(
         path: '/add-friend',
-        builder: (context, state) => const AddFriendScreen(),
+        pageBuilder: (context, state) => _buildSlideTransitionPage(
+          context: context,
+          state: state,
+          child: const AddFriendScreen(),
+        ),
       ),
       GoRoute(
         path: '/chat/:roomId',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final roomId = state.pathParameters['roomId']!;
-          return ChatRoomScreen(roomId: roomId);
+          return _buildSlideTransitionPage(
+            context: context,
+            state: state,
+            child: ChatRoomScreen(roomId: roomId),
+          );
         },
       ),
       GoRoute(
         path: '/edit-profile',
-        builder: (context, state) => const EditProfileScreen(),
+        pageBuilder: (context, state) => _buildSlideTransitionPage(
+          context: context,
+          state: state,
+          child: const EditProfileScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/notifications',
+        pageBuilder: (context, state) => _buildSlideTransitionPage(
+          context: context,
+          state: state,
+          child: const NotificationScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/privacy',
+        pageBuilder: (context, state) => _buildSlideTransitionPage(
+          context: context,
+          state: state,
+          child: const PrivacyScreen(),
+        ),
       ),
     ],
   );
@@ -260,4 +290,31 @@ int _getNavIndex(String location) {
   if (location.startsWith('/status')) return 3;
   if (location.startsWith('/profile')) return 4;
   return 0;
+}
+
+CustomTransitionPage _buildSlideTransitionPage({
+  required BuildContext context,
+  required GoRouterState state,
+  required Widget child,
+}) {
+  return CustomTransitionPage(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 300),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      const begin = Offset(1.0, 0.0);
+      const end = Offset.zero;
+      const curve = Curves.easeOutQuart;
+
+      final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+
+      return SlideTransition(
+        position: animation.drive(tween),
+        child: FadeTransition(
+          opacity: animation,
+          child: child,
+        ),
+      );
+    },
+  );
 }

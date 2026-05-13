@@ -30,7 +30,7 @@ Future<UserModel?> currentProfile(Ref ref) async {
 }
 
 /// Auth notifier for login, signup, and logout actions.
-@riverpod
+@Riverpod(keepAlive: true)
 class AuthNotifier extends _$AuthNotifier {
   @override
   FutureOr<void> build() {}

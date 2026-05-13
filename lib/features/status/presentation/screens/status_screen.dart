@@ -354,11 +354,19 @@ class _StatusCard extends StatelessWidget {
     );
   }
 
+  // Kiểm tra chuỗi thời gian (timestamp). Nếu chuỗi không chứa ký hiệu Z hoặc offset timezone (+07:00), hệ thống sẽ tự động chèn thêm chữ 'Z' vào cuối để ép Dart hiểu rằng đây là giờ UTC
   String _timeAgo(String timestamp) {
     try {
-      final dt = DateTime.parse(timestamp);
+      var ts = timestamp;
+      if (!ts.endsWith('Z') &&
+          !ts.contains('+') &&
+          !ts.contains(RegExp(r'-\d{2}:\d{2}$'))) {
+        ts = '${ts.replaceAll(' ', 'T')}Z';
+      }
+      final dt = DateTime.parse(ts).toLocal();
       final diff = DateTime.now().difference(dt);
-      if (diff.inMinutes < 1) return 'Vừa xong';
+
+      if (diff.isNegative || diff.inMinutes < 1) return 'Vừa xong';
       if (diff.inMinutes < 60) return '${diff.inMinutes}p';
       if (diff.inHours < 24) return '${diff.inHours}h';
       return '${diff.inDays}d';

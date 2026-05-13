@@ -46,6 +46,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   PointAnnotation? _myLocationAnnotation;
   geo.Point? _myLocationPoint;
   Uint8List? _myLocationIconBytes;
+  String? _lastAvatarUrl;
+  String? _lastName;
+  bool _isCreatingAnnotation = false;
   final Map<String, Uint8List> _friendIconBytes = {};
   final Map<String, PointAnnotation> _friendAnnotations = {};
   double _currentZoom = 13;
@@ -109,6 +112,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     // Update heading for compass / bearing tracking
     _lastHeading = pos.heading > 0 ? pos.heading : null;
 
+    // ALWAYS update annotation
+    _updateMyLocationAnnotation();
+
     if (!_hasFlownToUser) {
       _hasFlownToUser = true;
       // Wait for the map to be ready, then fly to the user
@@ -120,8 +126,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         });
       }
     } else {
-      // Map already rendered — update annotation and optionally follow
-      _updateMyLocationAnnotation();
+      // Map already rendered — optionally follow
       _maybeFollowUpdate();
     }
   }
@@ -493,6 +498,22 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     );
   }
 
+  Future<Uint8List> _getMyLocationIconBytes(UserModel? profile) async {
+    final avatarUrl = profile?.avatarUrl;
+    final name = profile?.displayName.isNotEmpty == true
+          ? profile!.displayName
+          : profile?.username ?? 'Me';
+
+    if (_myLocationIconBytes != null && _lastAvatarUrl == avatarUrl && _lastName == name) {
+      return _myLocationIconBytes!;
+    }
+
+    _lastAvatarUrl = avatarUrl;
+    _lastName = name;
+    _myLocationIconBytes = await _createMyLocationIconBytes(profile);
+    return _myLocationIconBytes!;
+  }
+
   Future<void> _onMapCreated(MapboxMap mapboxMap) async {
     _mapboxMap = mapboxMap;
     _annotationManager = await mapboxMap.annotations
@@ -509,25 +530,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     // Start periodic compass bearing sync
     _startCompassSync();
 
-    // Restore my location annotation from the background tracker's position
-    final trackerPos = ref.read(locationTrackerProvider);
-    if (trackerPos != null && !kIsWeb) {
-      final profile = ref.read(currentProfileProvider).value;
-      _myLocationIconBytes = await _createMyLocationIconBytes(profile);
-      _myLocationAnnotation = await _annotationManager!.create(
-        PointAnnotationOptions(
-          geometry: geo.Point(
-            coordinates: geo.Position(
-              trackerPos.longitude,
-              trackerPos.latitude,
-            ),
-          ),
-          image: _myLocationIconBytes,
-          iconSize: 1.0,
-          iconAnchor: IconAnchor.CENTER,
-        ),
-      );
-    }
+    // Initialize my location annotation
+    _updateMyLocationAnnotation();
   }
 
   void _onAnnotationTap(PointAnnotation annotation) {
@@ -549,20 +553,42 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     if (_myLocationPoint == null || _annotationManager == null) return;
 
     final profile = ref.read(currentProfileProvider).value;
-    _myLocationIconBytes = await _createMyLocationIconBytes(profile);
+    final iconBytes = await _getMyLocationIconBytes(profile);
 
     if (_myLocationAnnotation != null) {
-      _myLocationAnnotation!.geometry = _myLocationPoint!;
-      await _annotationManager!.update(_myLocationAnnotation!);
-    } else {
+      if (_myLocationAnnotation!.image != iconBytes) {
+        // Image changed: delete and recreate to avoid Mapbox caching/update issues
+        await _annotationManager!.delete(_myLocationAnnotation!);
+        _myLocationAnnotation = null;
+      } else {
+        // Only position changed
+        if (_myLocationAnnotation!.geometry != _myLocationPoint) {
+          _myLocationAnnotation!.geometry = _myLocationPoint!;
+          await _annotationManager!.update(_myLocationAnnotation!);
+        }
+        return;
+      }
+    }
+
+    if (_isCreatingAnnotation) return;
+    _isCreatingAnnotation = true;
+    try {
       _myLocationAnnotation = await _annotationManager!.create(
         PointAnnotationOptions(
           geometry: _myLocationPoint!,
-          image: _myLocationIconBytes!,
+          image: iconBytes,
           iconSize: 1.0,
           iconAnchor: IconAnchor.CENTER,
         ),
       );
+    } finally {
+      _isCreatingAnnotation = false;
+      // Re-sync if the point moved during creation
+      if (_myLocationAnnotation != null && _myLocationAnnotation!.geometry != _myLocationPoint) {
+         _myLocationAnnotation!.geometry = _myLocationPoint!;
+         _myLocationAnnotation!.image = iconBytes; // Preserve image
+         _annotationManager!.update(_myLocationAnnotation!);
+      }
     }
   }
 
@@ -627,6 +653,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   Widget build(BuildContext context) {
     final isSharing = ref.watch(locationSharingProvider);
     final locationPos = ref.watch(locationTrackerProvider);
+    final profile = ref.watch(currentProfileProvider).value;
+
+    // Trigger an annotation update if profile avatar or name changes
+    final currentAvatarUrl = profile?.avatarUrl;
+    final currentName = profile?.displayName.isNotEmpty == true
+        ? profile!.displayName
+        : profile?.username ?? 'Me';
+
+    if (currentAvatarUrl != _lastAvatarUrl || currentName != _lastName) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _updateMyLocationAnnotation();
+      });
+    }
 
     // Sync position from the background tracker after the frame is built.
     // This avoids calling setState() during build.
@@ -635,11 +674,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       _lastSyncedPosition = locationPos;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        if (_myLocationPoint == null) {
-          _onPositionUpdate(locationPos);
-        } else {
-          _updateMyLocationAnnotation();
-        }
+        _onPositionUpdate(locationPos);
       });
     }
 
