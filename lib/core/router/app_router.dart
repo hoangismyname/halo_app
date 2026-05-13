@@ -15,17 +15,29 @@ import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/profile/presentation/screens/edit_profile_screen.dart';
 import '../constants/app_colors.dart';
 
-// Shell for main navigation with bottom nav bar
-class _MainShell extends StatelessWidget {
-  final Widget child;
+// Shell for main navigation with IndexedStack — keeps all tab screens alive
+// so MapScreen is never disposed when switching to Chat, Friends, etc.
+// The MapWidget and its Geolocator stream stay running in the background.
+class _MainShell extends StatefulWidget {
+  final List<Widget> pages;
   final int currentIndex;
 
-  const _MainShell({required this.child, required this.currentIndex});
+  const _MainShell({required this.pages, required this.currentIndex});
+
+  @override
+  State<_MainShell> createState() => _MainShellState();
+}
+
+class _MainShellState extends State<_MainShell>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Scaffold(
-      body: child,
+      body: IndexedStack(index: widget.currentIndex, children: widget.pages),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: AppColors.bottomNav,
@@ -50,35 +62,35 @@ class _MainShell extends StatelessWidget {
                   icon: Icons.map_outlined,
                   activeIcon: Icons.map,
                   label: 'Bản đồ',
-                  isActive: currentIndex == 0,
+                  isActive: widget.currentIndex == 0,
                   onTap: () => context.go('/'),
                 ),
                 _NavItem(
                   icon: Icons.people_outline,
                   activeIcon: Icons.people,
                   label: 'Bạn bè',
-                  isActive: currentIndex == 1,
+                  isActive: widget.currentIndex == 1,
                   onTap: () => context.go('/friends'),
                 ),
                 _NavItem(
                   icon: Icons.chat_bubble_outline,
                   activeIcon: Icons.chat_bubble,
                   label: 'Chat',
-                  isActive: currentIndex == 2,
+                  isActive: widget.currentIndex == 2,
                   onTap: () => context.go('/chat'),
                 ),
                 _NavItem(
                   icon: Icons.mood_outlined,
                   activeIcon: Icons.mood,
                   label: 'Trạng thái',
-                  isActive: currentIndex == 3,
+                  isActive: widget.currentIndex == 3,
                   onTap: () => context.go('/status'),
                 ),
                 _NavItem(
                   icon: Icons.person_outline,
                   activeIcon: Icons.person,
                   label: 'Hồ sơ',
-                  isActive: currentIndex == 4,
+                  isActive: widget.currentIndex == 4,
                   onTap: () => context.go('/profile'),
                 ),
               ],
@@ -191,11 +203,20 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const RegisterScreen(),
       ),
 
-      // Main shell routes
+      // Main shell routes — IndexedStack keeps all tab screens alive
       ShellRoute(
         builder: (context, state, child) {
           final index = _getNavIndex(state.matchedLocation);
-          return _MainShell(currentIndex: index, child: child);
+          return _MainShell(
+            currentIndex: index,
+            pages: const [
+              MapScreen(),
+              FriendsListScreen(),
+              ChatListScreen(),
+              StatusScreen(),
+              ProfileScreen(),
+            ],
+          );
         },
         routes: [
           GoRoute(path: '/', builder: (context, state) => const MapScreen()),

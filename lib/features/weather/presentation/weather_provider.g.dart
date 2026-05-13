@@ -53,7 +53,7 @@ final class WeatherNotifierProvider
   }
 }
 
-String _$weatherNotifierHash() => r'456dd185e37b54af22e913496f91364f6d483b55';
+String _$weatherNotifierHash() => r'ea20e7ffd04aeb47caa92c721397ac5c75128e02';
 
 /// Riverpod notifier that tracks weather at the user's real-time location.
 ///

@@ -3,18 +3,17 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart' as geolocator;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart'
     hide Position, LocationSettings;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as geo;
-import 'package:geolocator/geolocator.dart' as geolocator;
-import 'package:shared_preferences/shared_preferences.dart';
-import '../../data/location_repository.dart';
-import '../providers/location_provider.dart';
 import '../../../friends/presentation/providers/friends_provider.dart';
 import '../../../auth/domain/user_model.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/mapbox_constants.dart';
+import '../providers/location_provider.dart';
+import '../providers/location_tracker.dart';
 import '../../widgets/friend_bottom_sheet.dart';
 import '../../widgets/map_controls.dart';
 import '../../../weather/presentation/widgets/weather_overlay.dart';
@@ -35,124 +34,68 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   final Map<String, Uint8List> _friendIconBytes = {};
   final Map<String, PointAnnotation> _friendAnnotations = {};
   double _currentZoom = 13;
-  StreamSubscription<geolocator.Position>? _positionStream;
   Cancelable? _tapCancelable;
 
-  /// Completer that fires once the map is created. Used by _initLocation to
-  /// wait for the map to be ready before flying to the user's position.
+  /// Completer that fires once the map is created.
   final Completer<void> _mapCreated = Completer<void>();
 
-  geo.Point _defaultCenter() => geo.Point(
-    coordinates: geo.Position(105.77641862688169, 21.038343621282284),
-  );
+  /// True once the map has flown to the user's location on this mount.
+  /// Reset on every re-entry so the user always sees their position.
+  bool _hasFlownToUser = false;
+
+  /// Tracks the last synced position from the tracker to avoid redundant
+  /// annotation updates on every build frame.
+  geolocator.Position? _lastSyncedPosition;
+
+  // ─────────────────────────────────────────── lifecycle ──
 
   @override
   void initState() {
     super.initState();
-    // Defer location setup to avoid blocking the build phase with permission
-    // requests. This prevents the app from hanging/crashing on first launch.
-    Future.microtask(() => _initLocation());
+    // The background LocationTracker provider is already running independently.
+    // We just listen for position updates and update the map UI.
+    _maybeFlyToUserFromTracker();
   }
 
-  /// True once the map has already flown to the user's location on startup.
-  bool _hasFlownToUser = false;
-
-  /// Attempt to fly to the user's location if the map is ready and we haven't
-  /// already done so. Called every time a new position is received.
-  void _maybeFlyToMyLocation() {
-    if (_hasFlownToUser || _mapboxMap == null || _myLocationPoint == null) {
-      return;
+  /// Fly to the user's position on first build (re-entry).
+  /// The LocationTracker keeps the stream alive in the background, so we
+  /// always have a fresh position even when returning from other screens.
+  void _maybeFlyToUserFromTracker() {
+    final position = ref.read(locationTrackerProvider);
+    if (position != null && !_hasFlownToUser) {
+      _onPositionUpdate(position);
     }
-    _hasFlownToUser = true;
-    _flyToMyLocation();
   }
 
-  Future<void> _initLocation() async {
-    final prefs = await SharedPreferences.getInstance();
-    final lastLat = prefs.getDouble('last_lat');
-    final lastLng = prefs.getDouble('last_lng');
+  /// Called when a new position arrives from the background tracker.
+  void _onPositionUpdate(geolocator.Position pos) {
+    if (!mounted) return;
 
-    // Priority 1: Restore the last saved position from offline storage
-    if (lastLat != null && lastLng != null) {
-      if (mounted) {
-        setState(() {
-          _myLocationPoint = geo.Point(
-            coordinates: geo.Position(lastLng, lastLat),
-          );
+    final point = geo.Point(
+      coordinates: geo.Position(pos.longitude, pos.latitude),
+    );
+    setState(() => _myLocationPoint = point);
+
+    if (!_hasFlownToUser) {
+      _hasFlownToUser = true;
+      // Wait for the map to be ready, then fly to the user
+      if (_mapCreated.isCompleted) {
+        _flyToMyLocation();
+      } else {
+        _mapCreated.future.then((_) {
+          if (mounted) _flyToMyLocation();
         });
       }
-      // Fly to the last known position so the map doesn't show an empty view
-      await _mapCreated.future;
-      _maybeFlyToMyLocation();
-    }
-
-    if (!kIsWeb) {
-      try {
-        ref.read(locationSharingProvider.notifier).start();
-
-        final repo = ref.read(locationRepositoryProvider);
-        final hasPerm = await repo.checkPermissions();
-
-        if (hasPerm) {
-          // Priority 2: Get the actual current position (more accurate than
-          // the offline cached position). This is the priority — the map will
-          // fly here even if it already flew to the last saved position.
-          final currentPos = await geolocator.Geolocator.getCurrentPosition(
-            locationSettings: const geolocator.LocationSettings(
-              accuracy: geolocator.LocationAccuracy.high,
-            ),
-          );
-          if (mounted) {
-            setState(() {
-              _myLocationPoint = geo.Point(
-                coordinates: geo.Position(
-                  currentPos.longitude,
-                  currentPos.latitude,
-                ),
-              );
-            });
-            prefs.setDouble('last_lat', currentPos.latitude);
-            prefs.setDouble('last_lng', currentPos.longitude);
-          }
-          await _mapCreated.future;
-          _maybeFlyToMyLocation();
-
-          // Start listening to position changes
-          _positionStream =
-              geolocator.Geolocator.getPositionStream(
-                locationSettings: const geolocator.LocationSettings(
-                  accuracy: geolocator.LocationAccuracy.high,
-                  distanceFilter: 10,
-                ),
-              ).listen((pos) {
-                if (mounted) {
-                  setState(() {
-                    _myLocationPoint = geo.Point(
-                      coordinates: geo.Position(pos.longitude, pos.latitude),
-                    );
-                  });
-                  prefs.setDouble('last_lat', pos.latitude);
-                  prefs.setDouble('last_lng', pos.longitude);
-                  _updateMyLocationAnnotation();
-                }
-              });
-        } else {
-          // No location permission — still fly to the last saved position
-          // if available so the map isn't empty
-          await _mapCreated.future;
-          _maybeFlyToMyLocation();
-        }
-      } catch (e) {
-        debugPrint('Location init failed: $e');
-      }
+    } else {
+      // Map already rendered — just update the annotation in place
+      _updateMyLocationAnnotation();
     }
   }
 
   void _flyToMyLocation() {
-    if (_mapboxMap == null) return;
-    final target = _myLocationPoint ?? _defaultCenter();
+    if (_mapboxMap == null || _myLocationPoint == null) return;
     _mapboxMap!.flyTo(
-      CameraOptions(center: target, zoom: 15),
+      CameraOptions(center: _myLocationPoint, zoom: 15),
       MapAnimationOptions(duration: 2000),
     );
   }
@@ -171,7 +114,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   @override
   void dispose() {
-    _positionStream?.cancel();
     _tapCancelable?.cancel();
     super.dispose();
   }
@@ -386,19 +328,23 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     // Set up tap listener for friend annotations
     _tapCancelable = _annotationManager!.tapEvents(onTap: _onAnnotationTap);
 
-    // Create my location icon and annotation
-    if (!kIsWeb) {
+    // Restore my location annotation from the background tracker's position
+    final trackerPos = ref.read(locationTrackerProvider);
+    if (trackerPos != null && !kIsWeb) {
       _myLocationIconBytes ??= await _createMyLocationIconBytes();
-      if (_myLocationPoint != null) {
-        _myLocationAnnotation = await _annotationManager!.create(
-          PointAnnotationOptions(
-            geometry: _myLocationPoint!,
-            image: _myLocationIconBytes,
-            iconSize: 1.0,
-            iconAnchor: IconAnchor.CENTER,
+      _myLocationAnnotation = await _annotationManager!.create(
+        PointAnnotationOptions(
+          geometry: geo.Point(
+            coordinates: geo.Position(
+              trackerPos.longitude,
+              trackerPos.latitude,
+            ),
           ),
-        );
-      }
+          image: _myLocationIconBytes,
+          iconSize: 1.0,
+          iconAnchor: IconAnchor.CENTER,
+        ),
+      );
     }
   }
 
@@ -497,6 +443,22 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   @override
   Widget build(BuildContext context) {
     final isSharing = ref.watch(locationSharingProvider);
+    final locationPos = ref.watch(locationTrackerProvider);
+
+    // Sync position from the background tracker after the frame is built.
+    // This avoids calling setState() during build.
+    // Guarded by _lastSyncedPosition to avoid redundant annotation updates.
+    if (locationPos != null && locationPos != _lastSyncedPosition) {
+      _lastSyncedPosition = locationPos;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (_myLocationPoint == null) {
+          _onPositionUpdate(locationPos);
+        } else {
+          _updateMyLocationAnnotation();
+        }
+      });
+    }
 
     ref.listen<Map<String, Map<String, dynamic>>>(friendLocationsProvider, (
       previous,
