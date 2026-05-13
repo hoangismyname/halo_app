@@ -185,21 +185,30 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   /// Instantly center the map on the user (no animation, for follow mode).
   void _centerOnUser() {
     if (_mapboxMap == null || _myLocationPoint == null) return;
-    _mapboxMap!.setCamera(
+    _mapboxMap!.flyTo(
       CameraOptions(
         center: _myLocationPoint,
         zoom: _currentZoom,
         bearing: _followMode == FollowMode.compass ? (_lastHeading ?? 0) : 0,
       ),
+      MapAnimationOptions(duration: 1500),
     );
+    // _mapboxMap!.setCamera(
+    //   CameraOptions(
+    //     center: _myLocationPoint,
+    //     zoom: _currentZoom,
+    //     bearing: _followMode == FollowMode.compass ? (_lastHeading ?? 0) : 0,
+    //   ),
+    // );
   }
 
   /// Rotate the map to the given bearing.
   void _updateMapBearing([double? bearing]) {
     if (_mapboxMap == null || _myLocationPoint == null) return;
     final b = bearing ?? (_followMode == FollowMode.compass ? _lastHeading : 0);
-    _mapboxMap!.setCamera(
+    _mapboxMap!.flyTo(
       CameraOptions(center: _myLocationPoint, bearing: b ?? 0),
+      MapAnimationOptions(duration: 1500),
     );
   }
 
