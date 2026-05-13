@@ -15,8 +15,22 @@ import '../../../../core/constants/mapbox_constants.dart';
 import '../providers/location_provider.dart';
 import '../providers/location_tracker.dart';
 import '../../widgets/friend_bottom_sheet.dart';
-import '../../widgets/map_controls.dart';
 import '../../../weather/presentation/widgets/weather_overlay.dart';
+
+/// Map camera follow mode (Google Maps style).
+enum FollowMode {
+  /// Not following — user can pan/rotate freely.
+  none,
+
+  /// Fly to user's location once (GPS dot).
+  gps,
+
+  /// Continuously follow user's position (map centers on user).
+  follow,
+
+  /// Follow + rotate map to user's heading (compass mode).
+  compass,
+}
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
@@ -35,6 +49,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   final Map<String, PointAnnotation> _friendAnnotations = {};
   double _currentZoom = 13;
   Cancelable? _tapCancelable;
+  Timer? _compassSyncTimer;
 
   /// Completer that fires once the map is created.
   final Completer<void> _mapCreated = Completer<void>();
@@ -47,7 +62,21 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   /// annotation updates on every build frame.
   geolocator.Position? _lastSyncedPosition;
 
-  // ─────────────────────────────────────────── lifecycle ──
+  // ────────────────────────── follow mode & compass ──
+
+  /// Map camera follow mode (Google Maps style).
+  FollowMode _followMode = FollowMode.none;
+
+  /// Current map bearing (degrees clockwise from north).
+  double _currentBearing = 0;
+
+  /// Last known heading from the location tracker (degrees clockwise from
+  /// north). Updated as new positions arrive from the background tracker.
+  double? _lastHeading;
+
+  /// When true, the compass button is visible because the map has been
+  /// rotated away from north (bearing != 0).
+  bool _showCompass = false;
 
   @override
   void initState() {
@@ -76,6 +105,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     );
     setState(() => _myLocationPoint = point);
 
+    // Update heading for compass / bearing tracking
+    _lastHeading = pos.heading > 0 ? pos.heading : null;
+
     if (!_hasFlownToUser) {
       _hasFlownToUser = true;
       // Wait for the map to be ready, then fly to the user
@@ -87,17 +119,122 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         });
       }
     } else {
-      // Map already rendered — just update the annotation in place
+      // Map already rendered — update annotation and optionally follow
       _updateMyLocationAnnotation();
+      _maybeFollowUpdate();
     }
   }
 
+  /// If in FOLLOW or COMPASS mode, move the map camera to center on the user.
+  void _maybeFollowUpdate() {
+    if (_mapboxMap == null) return;
+    final mode = _followMode;
+    if (mode != FollowMode.follow && mode != FollowMode.compass) return;
+    final point = _myLocationPoint;
+    if (point == null) return;
+    _mapboxMap!.setCamera(
+      CameraOptions(
+        center: point,
+        zoom: _currentZoom,
+        bearing: mode == FollowMode.compass
+            ? (_lastHeading ?? _currentBearing)
+            : 0,
+      ),
+    );
+  }
+
+  /// Cycle through follow modes: none → fly-to → follow → compass → none.
+  void _toggleFollowMode() {
+    switch (_followMode) {
+      case FollowMode.none:
+        _followMode = FollowMode.gps;
+        _flyToMyLocation();
+        break;
+      case FollowMode.gps:
+        _followMode = FollowMode.follow;
+        // Keep centered, no bearing
+        _centerOnUser();
+        break;
+      case FollowMode.follow:
+        _followMode = FollowMode.compass;
+        // Center + rotate to heading
+        _centerOnUser();
+        _updateMapBearing();
+        break;
+      case FollowMode.compass:
+        _followMode = FollowMode.none;
+        _updateMapBearing();
+        break;
+    }
+    setState(() {});
+  }
+
+  /// Fly to user's location with animation. Used for initial GPS mode entry.
   void _flyToMyLocation() {
     if (_mapboxMap == null || _myLocationPoint == null) return;
     _mapboxMap!.flyTo(
-      CameraOptions(center: _myLocationPoint, zoom: 15),
+      CameraOptions(
+        center: _myLocationPoint,
+        zoom: 15,
+        bearing: _followMode == FollowMode.compass ? (_lastHeading ?? 0) : 0,
+      ),
       MapAnimationOptions(duration: 2000),
     );
+  }
+
+  /// Instantly center the map on the user (no animation, for follow mode).
+  void _centerOnUser() {
+    if (_mapboxMap == null || _myLocationPoint == null) return;
+    _mapboxMap!.setCamera(
+      CameraOptions(
+        center: _myLocationPoint,
+        zoom: _currentZoom,
+        bearing: _followMode == FollowMode.compass ? (_lastHeading ?? 0) : 0,
+      ),
+    );
+  }
+
+  /// Rotate the map to the given bearing.
+  void _updateMapBearing([double? bearing]) {
+    if (_mapboxMap == null || _myLocationPoint == null) return;
+    final b = bearing ?? (_followMode == FollowMode.compass ? _lastHeading : 0);
+    _mapboxMap!.setCamera(
+      CameraOptions(center: _myLocationPoint, bearing: b ?? 0),
+    );
+  }
+
+  /// Reset the compass to north (bearing = 0).
+  void _resetCompass() {
+    _followMode = FollowMode.none;
+    _updateMapBearing(0);
+    setState(() => _showCompass = false);
+  }
+
+  /// Listen to camera changes to detect manual rotation (compass visibility).
+  void _onCameraChanged() {
+    if (_mapboxMap == null) return;
+    // Get current camera bearing to show/hide compass
+    _mapboxMap!.getCameraState().then((state) {
+      if (!mounted) return;
+      final bearing = state.bearing;
+      setState(() {
+        _currentBearing = bearing;
+        // Show compass when map is rotated more than 5 degrees from north
+        _showCompass = bearing.abs() > 5;
+        // If user manually rotates the map, exit follow mode
+        if (_showCompass && _followMode != FollowMode.compass) {
+          _followMode = FollowMode.none;
+        }
+      });
+    });
+  }
+
+  /// Periodically sync the compass bearing from the map camera.
+  void _startCompassSync() {
+    _compassSyncTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      if (!mounted) return;
+      _onCameraChanged();
+    });
   }
 
   void _zoomIn() {
@@ -115,6 +252,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   @override
   void dispose() {
     _tapCancelable?.cancel();
+    _compassSyncTimer?.cancel();
     super.dispose();
   }
 
@@ -327,6 +465,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
     // Set up tap listener for friend annotations
     _tapCancelable = _annotationManager!.tapEvents(onTap: _onAnnotationTap);
+
+    // Start periodic compass bearing sync
+    _startCompassSync();
 
     // Restore my location annotation from the background tracker's position
     final trackerPos = ref.read(locationTrackerProvider);
@@ -577,15 +718,62 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             child: const WeatherOverlay(),
           ),
 
+          // Map controls — right side
           Positioned(
             right: AppSizes.md,
             bottom: AppSizes.xxl + 80,
-            child: MapControls(
-              onMyLocation: _flyToMyLocation,
-              onZoomIn: _zoomIn,
-              onZoomOut: _zoomOut,
+            child: Column(
+              children: [
+                // Follow mode / location button
+                _FollowButton(mode: _followMode, onTap: _toggleFollowMode),
+                const SizedBox(height: 8),
+
+                // Zoom controls
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.surface.withValues(alpha: 0.9),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      _MapControlButton(
+                        icon: Icons.add,
+                        onTap: _zoomIn,
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(12),
+                        ),
+                      ),
+                      Container(height: 1, color: AppColors.divider),
+                      _MapControlButton(
+                        icon: Icons.remove,
+                        onTap: _zoomOut,
+                        borderRadius: const BorderRadius.vertical(
+                          bottom: Radius.circular(12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
+
+          // Compass button — appears when map is rotated from north
+          if (_showCompass || _followMode == FollowMode.compass)
+            Positioned(
+              right: AppSizes.md + 8,
+              top: MediaQuery.paddingOf(context).top + 130,
+              child: _CompassButton(
+                bearing: _currentBearing,
+                onTap: _resetCompass,
+              ),
+            ),
         ],
       ),
     );
@@ -601,6 +789,145 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) =>
           FriendBottomSheet(userId: userId, locationData: data, friend: friend),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Follow mode button (Google Maps style location button)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _FollowButton extends StatelessWidget {
+  final FollowMode mode;
+  final VoidCallback onTap;
+
+  const _FollowButton({required this.mode, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final isActive = mode != FollowMode.none;
+    final icon = _iconForMode();
+
+    return Material(
+      color: AppColors.surface.withValues(alpha: 0.9),
+      borderRadius: BorderRadius.circular(12),
+      elevation: isActive ? 2 : 0,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: isActive
+                ? AppColors.primary.withValues(alpha: 0.15)
+                : AppColors.surface.withValues(alpha: 0.9),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.3),
+                blurRadius: 8,
+              ),
+            ],
+          ),
+          child: Icon(
+            icon,
+            color: isActive ? AppColors.primary : AppColors.textPrimary,
+            size: 22,
+          ),
+        ),
+      ),
+    );
+  }
+
+  IconData _iconForMode() {
+    switch (mode) {
+      case FollowMode.none:
+        return Icons.my_location_outlined;
+      case FollowMode.gps:
+        return Icons.my_location;
+      case FollowMode.follow:
+        return Icons.explore;
+      case FollowMode.compass:
+        return Icons.explore;
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Compass button — rotates with map bearing, tap to reset to north
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _CompassButton extends StatelessWidget {
+  final double bearing;
+  final VoidCallback onTap;
+
+  const _CompassButton({required this.bearing, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surface.withValues(alpha: 0.9),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: AppColors.surface.withValues(alpha: 0.9),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.3),
+                blurRadius: 8,
+              ),
+            ],
+          ),
+          child: Transform.rotate(
+            angle: bearing * (3.14159 / 180),
+            child: const Icon(
+              Icons.explore,
+              color: AppColors.textPrimary,
+              size: 22,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Generic map control button (zoom, etc.)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _MapControlButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final BorderRadius? borderRadius;
+
+  const _MapControlButton({
+    required this.icon,
+    required this.onTap,
+    this.borderRadius,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: borderRadius ?? BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: borderRadius ?? BorderRadius.circular(12),
+        child: SizedBox(
+          width: 44,
+          height: 44,
+          child: Icon(icon, color: AppColors.textPrimary, size: 22),
+        ),
+      ),
     );
   }
 }
