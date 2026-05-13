@@ -38,8 +38,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   StreamSubscription<geolocator.Position>? _positionStream;
   Cancelable? _tapCancelable;
 
-  geo.Point _defaultCenter() =>
-      geo.Point(coordinates: geo.Position(106.6297, 10.8231));
+  /// Completer that fires once the map is created. Used by _initLocation to
+  /// wait for the map to be ready before flying to the user's position.
+  final Completer<void> _mapCreated = Completer<void>();
+
+  geo.Point _defaultCenter() => geo.Point(
+    coordinates: geo.Position(105.77641862688169, 21.038343621282284),
+  );
 
   @override
   void initState() {
@@ -49,15 +54,36 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     Future.microtask(() => _initLocation());
   }
 
+  /// True once the map has already flown to the user's location on startup.
+  bool _hasFlownToUser = false;
+
+  /// Attempt to fly to the user's location if the map is ready and we haven't
+  /// already done so. Called every time a new position is received.
+  void _maybeFlyToMyLocation() {
+    if (_hasFlownToUser || _mapboxMap == null || _myLocationPoint == null) {
+      return;
+    }
+    _hasFlownToUser = true;
+    _flyToMyLocation();
+  }
+
   Future<void> _initLocation() async {
     final prefs = await SharedPreferences.getInstance();
-    final lat = prefs.getDouble('last_lat');
-    final lng = prefs.getDouble('last_lng');
+    final lastLat = prefs.getDouble('last_lat');
+    final lastLng = prefs.getDouble('last_lng');
 
-    if (lat != null && lng != null && mounted) {
-      setState(() {
-        _myLocationPoint = geo.Point(coordinates: geo.Position(lng, lat));
-      });
+    // Priority 1: Restore the last saved position from offline storage
+    if (lastLat != null && lastLng != null) {
+      if (mounted) {
+        setState(() {
+          _myLocationPoint = geo.Point(
+            coordinates: geo.Position(lastLng, lastLat),
+          );
+        });
+      }
+      // Fly to the last known position so the map doesn't show an empty view
+      await _mapCreated.future;
+      _maybeFlyToMyLocation();
     }
 
     if (!kIsWeb) {
@@ -68,22 +94,30 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         final hasPerm = await repo.checkPermissions();
 
         if (hasPerm) {
-          if (lat == null) {
-            final lastKnown =
-                await geolocator.Geolocator.getLastKnownPosition();
-            if (lastKnown != null && mounted) {
-              setState(() {
-                _myLocationPoint = geo.Point(
-                  coordinates: geo.Position(
-                    lastKnown.longitude,
-                    lastKnown.latitude,
-                  ),
-                );
-              });
-              if (_mapboxMap != null) _flyToMyLocation();
-            }
+          // Priority 2: Get the actual current position (more accurate than
+          // the offline cached position). This is the priority — the map will
+          // fly here even if it already flew to the last saved position.
+          final currentPos = await geolocator.Geolocator.getCurrentPosition(
+            locationSettings: const geolocator.LocationSettings(
+              accuracy: geolocator.LocationAccuracy.high,
+            ),
+          );
+          if (mounted) {
+            setState(() {
+              _myLocationPoint = geo.Point(
+                coordinates: geo.Position(
+                  currentPos.longitude,
+                  currentPos.latitude,
+                ),
+              );
+            });
+            prefs.setDouble('last_lat', currentPos.latitude);
+            prefs.setDouble('last_lng', currentPos.longitude);
           }
+          await _mapCreated.future;
+          _maybeFlyToMyLocation();
 
+          // Start listening to position changes
           _positionStream =
               geolocator.Geolocator.getPositionStream(
                 locationSettings: const geolocator.LocationSettings(
@@ -102,6 +136,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   _updateMyLocationAnnotation();
                 }
               });
+        } else {
+          // No location permission — still fly to the last saved position
+          // if available so the map isn't empty
+          await _mapCreated.future;
+          _maybeFlyToMyLocation();
         }
       } catch (e) {
         debugPrint('Location init failed: $e');
@@ -114,7 +153,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final target = _myLocationPoint ?? _defaultCenter();
     _mapboxMap!.flyTo(
       CameraOptions(center: target, zoom: 15),
-      MapAnimationOptions(duration: 1000),
+      MapAnimationOptions(duration: 2000),
     );
   }
 
@@ -338,6 +377,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _mapboxMap = mapboxMap;
     _annotationManager = await mapboxMap.annotations
         .createPointAnnotationManager();
+
+    // Signal that the map is ready
+    if (!_mapCreated.isCompleted) {
+      _mapCreated.complete();
+    }
 
     // Set up tap listener for friend annotations
     _tapCancelable = _annotationManager!.tapEvents(onTap: _onAnnotationTap);

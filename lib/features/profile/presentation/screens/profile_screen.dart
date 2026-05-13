@@ -164,11 +164,8 @@ class ProfileScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: AppSizes.xl),
                 // Settings
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.card,
-                    borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-                  ),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppSizes.radiusMd),
                   child: Column(
                     children: [
                       _SettingsTile(
@@ -179,7 +176,18 @@ class ProfileScreen extends ConsumerWidget {
                           onChanged: (v) {
                             ref.read(locationSharingProvider.notifier).toggle();
                           },
-                          activeThumbColor: AppColors.primary,
+                          thumbColor: WidgetStateProperty.resolveWith((states) {
+                            if (states.contains(WidgetState.selected)) {
+                              return AppColors.textOnPrimary;
+                            }
+                            return AppColors.textTertiary;
+                          }),
+                          trackColor: WidgetStateProperty.resolveWith((states) {
+                            if (states.contains(WidgetState.selected)) {
+                              return AppColors.primary;
+                            }
+                            return AppColors.surfaceLight;
+                          }),
                         ),
                       ),
                       const Divider(height: 1, indent: 56, endIndent: 16),
@@ -289,6 +297,9 @@ class _SettingsTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       onTap: onTap,
+      tileColor: AppColors.card,
+      hoverColor: AppColors.primary.withValues(alpha: 0.08),
+      splashColor: AppColors.primary.withValues(alpha: 0.12),
       leading: Container(
         width: 36,
         height: 36,
