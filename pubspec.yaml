@@ -52,6 +52,7 @@ dependencies:
   timeago: ^3.7.1
   dotenv: ^4.2.0
   flutter_dotenv: ^5.2.1
+  dio: ^5.9.2
 
 dev_dependencies:
   flutter_test:

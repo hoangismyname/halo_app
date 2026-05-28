@@ -56,6 +56,16 @@ class AuthRepository {
     );
   }
 
+  /// Sign in with Google.
+  Future<bool> signInWithGoogle() async {
+    return await _client.auth.signInWithOAuth(OAuthProvider.google);
+  }
+
+  /// Sign in with Facebook.
+  Future<bool> signInWithFacebook() async {
+    return await _client.auth.signInWithOAuth(OAuthProvider.facebook);
+  }
+
   /// Sign out the current user.
   Future<void> signOut() async {
     await _client.auth.signOut();

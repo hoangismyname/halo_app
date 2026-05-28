@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -23,6 +24,13 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
   bool _showStickerPicker = false;
   String _roomTitle = 'Chat';
 
+  /// Tracks which user IDs are currently typing and when they started.
+  final Map<String, DateTime> _typingUsers = {};
+
+  Timer? _debounceTimer;
+  Timer? _typingExpiryTimer;
+  RealtimeChannel? _typingChannel;
+
   String get _currentUserId =>
       Supabase.instance.client.auth.currentUser?.id ?? '';
 
@@ -30,33 +38,48 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
   void initState() {
     super.initState();
     _loadRoomTitle();
+    _subscribeToTyping();
   }
 
-  Future<void> _loadRoomTitle() async {
-    try {
+  void _subscribeToTyping() {
+    final repo = ref.read(chatRepositoryProvider);
+    _typingChannel = repo.subscribeTyping(widget.roomId, _onTyping);
+  }
+
+  void _onTyping(Map<String, dynamic> payload) {
+    final userId = payload['user_id'] as String?;
+    if (userId == null || userId == _currentUserId) return;
+
+    final now = DateTime.now();
+    setState(() {
+      _typingUsers[userId] = now;
+    });
+
+    // Remove typing status after 3 seconds of inactivity for that user
+    _typingExpiryTimer?.cancel();
+    _typingExpiryTimer = Timer(const Duration(seconds: 3), () {
+      final cutoff = DateTime.now().subtract(const Duration(seconds: 3));
+      setState(() {
+        _typingUsers.removeWhere((_, time) => time.isBefore(cutoff));
+      });
+    });
+  }
+
+  /// Broadcasts a typing event to other room members, debounced to avoid
+  /// flooding the channel. Called on every keystroke.
+  void _broadcastTypingDebounced() {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 1500), () {
       final repo = ref.read(chatRepositoryProvider);
-      final members = await repo.getRoomMembers(widget.roomId);
-      for (final member in members) {
-        final userId = member['user_id'] as String?;
-        if (userId != null && userId != _currentUserId) {
-          final profile = member['profiles'] as Map<String, dynamic>?;
-          if (profile != null && mounted) {
-            setState(() {
-              _roomTitle = profile['display_name'] as String? ??
-                  profile['username'] as String? ??
-                  'Chat';
-            });
-          }
-          break;
-        }
-      }
-    } catch (_) {
-      // Keep default title
-    }
+      repo.broadcastTyping(widget.roomId);
+    });
   }
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
+    _typingExpiryTimer?.cancel();
+    _typingChannel?.unsubscribe();
     _scrollController.dispose();
     super.dispose();
   }
@@ -74,6 +97,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
   Future<void> _sendMessage(String content) async {
     if (content.trim().isEmpty) return;
 
+    _debounceTimer?.cancel();
     await ref.read(chatActionsProvider.notifier).sendMessage(
           roomId: widget.roomId,
           content: content.trim(),
@@ -97,6 +121,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
   @override
   Widget build(BuildContext context) {
     final messagesStream = ref.watch(messagesStreamProvider(widget.roomId));
+    final typingUsersCount = _typingUsers.length;
 
     return Scaffold(
       appBar: AppBar(
@@ -108,6 +133,32 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
       ),
       body: Column(
         children: [
+          // Typing indicator
+          if (typingUsersCount > 0)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSizes.md,
+                vertical: AppSizes.xs,
+              ),
+              color: AppColors.surface,
+              child: Row(
+                children: [
+                  const _TypingDots(),
+                  const SizedBox(width: 8),
+                  Text(
+                    typingUsersCount == 1 ? 'đang nhập...' : 'có người đang nhập...',
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      color: AppColors.textTertiary,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           // Messages list
           Expanded(
             child: messagesStream.when(
@@ -185,11 +236,90 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
             onSend: _sendMessage,
             onStickerTap: () =>
                 setState(() => _showStickerPicker = !_showStickerPicker),
+            onTyping: _broadcastTypingDebounced,
             showingStickerPicker: _showStickerPicker,
           ),
         ],
       ),
     );
   }
+
+  Future<void> _loadRoomTitle() async {
+    try {
+      final repo = ref.read(chatRepositoryProvider);
+      final members = await repo.getRoomMembers(widget.roomId);
+      for (final member in members) {
+        final userId = member['user_id'] as String?;
+        if (userId != null && userId != _currentUserId) {
+          final profile = member['profiles'] as Map<String, dynamic>?;
+          if (profile != null && mounted) {
+            setState(() {
+              _roomTitle = profile['display_name'] as String? ??
+                  profile['username'] as String? ??
+                  'Chat';
+            });
+          }
+          break;
+        }
+      }
+    } catch (_) {
+      // Keep default title
+    }
+  }
 }
 
+/// Animated bouncing dots indicating active typing.
+class _TypingDots extends StatefulWidget {
+  const _TypingDots();
+
+  @override
+  State<_TypingDots> createState() => _TypingDotsState();
+}
+
+class _TypingDotsState extends State<_TypingDots>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(3, (index) {
+            final delay = index * 0.2;
+            final value =
+                ((_controller.value + delay) % 1.0);
+            final scale = (value < 0.5 ? value * 2 : (1 - value) * 2)
+                .clamp(0.0, 1.0);
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 1.5),
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: AppColors.textTertiary.withValues(alpha: 0.3 + scale * 0.7),
+                shape: BoxShape.circle,
+              ),
+            );
+          }),
+        );
+      },
+    );
+  }
+}

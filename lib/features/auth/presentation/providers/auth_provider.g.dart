@@ -163,7 +163,7 @@ final class AuthNotifierProvider
   AuthNotifier create() => AuthNotifier();
 }
 
-String _$authNotifierHash() => r'c976ef8defa87b622062029e71f19d52f4283490';
+String _$authNotifierHash() => r'59796f5b3117d9927a9abc3b0eebf2683df75989';
 
 /// Auth notifier for login, signup, and logout actions.
 

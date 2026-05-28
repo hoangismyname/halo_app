@@ -97,7 +97,7 @@ final class StatusNotifierProvider
   StatusNotifier create() => StatusNotifier();
 }
 
-String _$statusNotifierHash() => r'66f3dae70f9e6553871e254d7ff7e85ced323928';
+String _$statusNotifierHash() => r'1e26b88c952ebe5d1d7acdb78991f17b1c8fc21a';
 
 /// Status update notifier.
 ///

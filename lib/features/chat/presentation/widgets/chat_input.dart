@@ -5,12 +5,14 @@ import '../../../../core/constants/app_sizes.dart';
 class ChatInput extends StatefulWidget {
   final void Function(String) onSend;
   final VoidCallback onStickerTap;
+  final VoidCallback? onTyping;
   final bool showingStickerPicker;
 
   const ChatInput({
     super.key,
     required this.onSend,
     required this.onStickerTap,
+    this.onTyping,
     this.showingStickerPicker = false,
   });
 
@@ -82,8 +84,10 @@ class _ChatInputState extends State<ChatInput> {
               child: TextField(
                 controller: _controller,
                 maxLines: null,
-                onChanged: (text) =>
-                    setState(() => _hasText = text.trim().isNotEmpty),
+                onChanged: (text) {
+                  setState(() => _hasText = text.trim().isNotEmpty);
+                  widget.onTyping?.call();
+                },
                 onSubmitted: (_) => _send(),
                 style: const TextStyle(
                   fontFamily: 'Inter',

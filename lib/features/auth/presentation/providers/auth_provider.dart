@@ -65,6 +65,26 @@ class AuthNotifier extends _$AuthNotifier {
     return !state.hasError;
   }
 
+  /// Sign in with Google. Returns true on success.
+  Future<bool> signInWithGoogle() async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      final repo = ref.read(authRepositoryProvider);
+      await repo.signInWithGoogle();
+    });
+    return !state.hasError;
+  }
+
+  /// Sign in with Facebook. Returns true on success.
+  Future<bool> signInWithFacebook() async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      final repo = ref.read(authRepositoryProvider);
+      await repo.signInWithFacebook();
+    });
+    return !state.hasError;
+  }
+
   /// Sign out the current user and invalidate auth providers.
   Future<void> signOut() async {
     state = const AsyncLoading();
