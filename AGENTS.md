@@ -10,22 +10,22 @@ This file provides guidance to AI agents when working with code in this reposito
 
 ```bash
 # Install dependencies
-flutter pub get
+/home/hoangnh/flutter/bin pub get
 
 # Analyze code for lint errors
-flutter analyze
+/home/hoangnh/flutter/bin analyze
 
 # Run tests
-flutter test
+/home/hoangnh/flutter/bin test
 
 # Run the app
-flutter run
+/home/hoangnh/flutter/bin run
 
 # Build for release
-flutter build apk --release
+/home/hoangnh/flutter/bin build apk --release
 
 # Build for debug
-flutter build apk --debug
+/home/hoangnh/flutter/bin build apk --debug
 ```
 
 ## Code Generation
@@ -33,7 +33,7 @@ flutter build apk --debug
 This project uses code generation for Riverpod, Freezed, and JSON serialization. After modifying any `.dart` file with `@riverpod`, `freezed`, or `json_serializable` annotations, you must regenerate:
 
 ```bash
-flutter pub run build_runner build --delete-conflicting-outputs
+/home/hoangnh/flutter/bin pub run build_runner build --delete-conflicting-outputs
 ```
 
 Generated files: `*.g.dart` (Riverpod), `*.freezed.dart` (Freezed), `*.g.dart` (JSON).

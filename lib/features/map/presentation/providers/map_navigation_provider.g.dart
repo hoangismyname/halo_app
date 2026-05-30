@@ -41,7 +41,7 @@ final class MapNavigationProvider
   }
 }
 
-String _$mapNavigationHash() => r'7e1a43a2de2b37a7d48c0310b88de00d66f16cc5';
+String _$mapNavigationHash() => r'32944a877cd08a83f31815bab582436213dfa5cc';
 
 abstract class _$MapNavigation extends $Notifier<MapNavigationState> {
   MapNavigationState build();

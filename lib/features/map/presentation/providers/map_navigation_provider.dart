@@ -8,6 +8,7 @@ part 'map_navigation_provider.g.dart';
 
 class MapNavigationState {
   final bool isLoading;
+  final bool isNavigating;
   final String? errorMessage;
   final List<geo.Position>? routeCoordinates;
   final double? distance;
@@ -16,6 +17,7 @@ class MapNavigationState {
 
   MapNavigationState({
     this.isLoading = false,
+    this.isNavigating = false,
     this.errorMessage,
     this.routeCoordinates,
     this.distance,
@@ -25,6 +27,7 @@ class MapNavigationState {
 
   MapNavigationState copyWith({
     bool? isLoading,
+    bool? isNavigating,
     Object? errorMessage = _unset,
     List<geo.Position>? routeCoordinates,
     double? distance,
@@ -33,6 +36,7 @@ class MapNavigationState {
   }) {
     return MapNavigationState(
       isLoading: isLoading ?? this.isLoading,
+      isNavigating: isNavigating ?? this.isNavigating,
       errorMessage:
           errorMessage == _unset ? this.errorMessage : errorMessage as String?,
       routeCoordinates: routeCoordinates ?? this.routeCoordinates,
@@ -53,6 +57,15 @@ class MapNavigation extends _$MapNavigation {
   @override
   MapNavigationState build() {
     return MapNavigationState();
+  }
+
+  void startNavigation() {
+    if (state.routeCoordinates == null) return;
+    state = state.copyWith(isNavigating: true);
+  }
+
+  void stopNavigation() {
+    state = MapNavigationState();
   }
 
   Future<void> fetchRoute({

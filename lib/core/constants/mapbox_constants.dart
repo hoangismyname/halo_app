@@ -17,4 +17,9 @@ class MapboxConstants {
   static const double cameraHorizontalPadding = 50.0;
   static const double defaultBearing = 0.0;
   static const double defaultPitch = 0.0;
+
+  // Navigation mode camera
+  static const double navigationZoom = 18;
+  static const double navigationPitch = 45.0;
+  static const double navigationPaddingTop = 200.0;
 }

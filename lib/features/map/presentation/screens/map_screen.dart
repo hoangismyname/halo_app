@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart' as geolocator;
 import 'package:halo/core/utils/position_extensions.dart';
@@ -53,6 +54,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   PointAnnotation? _myLocationAnnotation;
   geo.Point? _myLocationPoint;
   Uint8List? _myLocationIconBytes;
+  Uint8List? _destinationIconBytes;
   String? _lastAvatarUrl;
   String? _lastName;
   bool _isCreatingAnnotation = false;
@@ -88,6 +90,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   /// When true, the compass button is visible because the map has been
   /// rotated away from north (bearing != 0).
   bool _showCompass = false;
+
+  /// Viewport state for driving / follow navigation mode (Google Maps style)
+  ViewportState _currentViewport = const IdleViewportState();
+  bool _isCameraFollowing = false;
 
   @override
   void initState() {
@@ -276,6 +282,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _tapCancelable?.cancel();
     _compassSyncTimer?.cancel();
     _removeDestinationMarker();
+    _mapboxMap?.location.updateSettings(
+      LocationComponentSettings(enabled: false),
+    );
+    _mapboxMap = null;
+    _annotationManager = null;
+    _polylineManager = null;
     super.dispose();
   }
 
@@ -317,7 +329,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   /// Draws (or updates) the navigation polyline on the map.
   /// Styled to look like Google Maps: thick route body + thin casing.
   Future<void> _drawRoute(List<geo.Position> coords) async {
-    if (_polylineManager == null || coords.length < 2) return;
+    if (!mounted || _polylineManager == null || coords.length < 2) return;
 
     // Convert to LineString geometry
     final geometry = geo.LineString(coordinates: coords);
@@ -325,63 +337,45 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     // secondaryDark = 0xFF651FFF — pass as ARGB int
     const routeColor = AppColors.secondaryDark;
 
-    if (_routePolyline != null) {
-      // Update existing polyline
-      _routePolyline!.geometry = geometry;
-      _routePolyline!.lineWidth = 6.0;
-      _routePolyline!.lineColor = routeColor.toARGB32();
-      await _polylineManager!.update(_routePolyline!);
-    } else {
-      // Create the route polyline
-      _routePolyline = await _polylineManager!.create(
-        PolylineAnnotationOptions(
-          geometry: geometry,
-          lineWidth: 6.0,
-          lineColor: routeColor.toARGB32(),
-          lineOpacity: 0.92,
-          lineJoin: LineJoin.ROUND,
-        ),
-      );
-      // lineCap is a manager-level style property
-      await _polylineManager!.setLineCap(LineCap.ROUND);
+    try {
+      if (_routePolyline != null) {
+        // Update existing polyline
+        _routePolyline!.geometry = geometry;
+        _routePolyline!.lineWidth = 6.0;
+        _routePolyline!.lineColor = routeColor.toARGB32();
+        await _polylineManager!.update(_routePolyline!);
+      } else {
+        // Create the route polyline
+        _routePolyline = await _polylineManager!.create(
+          PolylineAnnotationOptions(
+            geometry: geometry,
+            lineWidth: 6.0,
+            lineColor: routeColor.toARGB32(),
+            lineOpacity: 0.92,
+            lineJoin: LineJoin.ROUND,
+          ),
+        );
+        // lineCap is a manager-level style property
+        await _polylineManager!.setLineCap(LineCap.ROUND);
+      }
+
+      // Fly camera to fit the route
+      await flyToFitRoute(coords);
+    } catch (e) {
+      debugPrint('❌ _drawRoute failed: $e');
     }
-
-    // Fly camera to fit the route
-
-    // Cách cũ
-    // if (_mapboxMap != null && coords.isNotEmpty) {
-    //   // 1. Tính toán CameraOptions dựa trên danh sách tọa độ
-    //   final camera = await _mapboxMap!.cameraForCoordinatesPadding(
-    //     coords
-    //         .map((position) => Point(coordinates: position))
-    //         .toList(), // Danh sách các điểm tọa độ của tuyến đường
-    //     CameraOptions(
-    //       padding: MbxEdgeInsets(
-    //         top: 100,
-    //         left: 50,
-    //         bottom: 100,
-    //         right: 50,
-    //       ), // Padding để route không bị sát mép màn hình
-    //       bearing: 0,
-    //       pitch: 0,
-    //     ),
-    //     null,
-    //     null,
-    //     null,
-    //   );
-    //   // 2. Fly đến camera đã được tính toán
-    //   await _mapboxMap!.flyTo(camera, MapAnimationOptions(duration: 1500));
-    // }
-
-    // hàm tối ưu
-    await flyToFitRoute(coords);
   }
 
   /// Removes the polyline from the map.
   Future<void> _clearRoute() async {
     if (_polylineManager != null && _routePolyline != null) {
-      await _polylineManager!.delete(_routePolyline!);
-      _routePolyline = null;
+      try {
+        await _polylineManager!.delete(_routePolyline!);
+      } catch (e) {
+        debugPrint('❌ _clearRoute failed: $e');
+      } finally {
+        _routePolyline = null;
+      }
     }
   }
 
@@ -390,19 +384,34 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   /// Places a destination pin at the given [point] on the map.
   Future<void> _addDestinationMarker(geo.Point point) async {
     await _removeDestinationMarker();
-    if (_annotationManager == null) return;
+    if (!mounted || _annotationManager == null) return;
 
-    //TODO: Change textField to image Uint8list
-    _destinationAnnotation = await _annotationManager!.create(
-      PointAnnotationOptions(
-        geometry: point,
-        iconImage: 'marker-15',
-        iconSize: 2.0,
-        iconAnchor: IconAnchor.BOTTOM,
-        iconColor: AppColors.secondaryDark.toARGB32(),
-        textField: 'destination_pin',
-      ),
-    );
+    if (_destinationIconBytes == null) {
+      try {
+        final ByteData data = await rootBundle.load(
+          'assets/icons/icons_location.png',
+        );
+        _destinationIconBytes = data.buffer.asUint8List(
+          data.offsetInBytes,
+          data.lengthInBytes,
+        );
+      } catch (e) {
+        debugPrint('Error loading destination icon asset: $e');
+      }
+    }
+
+    try {
+      _destinationAnnotation = await _annotationManager!.create(
+        PointAnnotationOptions(
+          geometry: point,
+          image: _destinationIconBytes,
+          iconSize: 1.5,
+          iconAnchor: IconAnchor.BOTTOM,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error creating destination marker: $e');
+    }
   }
 
   /// Removes the destination marker from the map.
@@ -412,8 +421,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         await _annotationManager!.delete(_destinationAnnotation!);
       } catch (_) {
         // Marker may already have been removed.
+      } finally {
+        _destinationAnnotation = null;
       }
-      _destinationAnnotation = null;
     }
   }
 
@@ -432,9 +442,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => DestinationBottomSheet(
-        latitude: lat.toDouble(),
-        longitude: lng.toDouble(),
+      builder: (context) => BackButtonListener(
+        onBackButtonPressed: () async {
+          // Bắt buộc đóng BottomSheet bằng đúng context của chính nó
+          Navigator.of(context).pop();
+          return true; // báo cho Flutter đã xử lý nút back
+        },
+        child: DestinationBottomSheet(
+          latitude: lat.toDouble(),
+          longitude: lng.toDouble(),
+        ),
       ),
     ).whenComplete(() {
       // If user dismissed without navigating, remove the marker
@@ -443,6 +460,100 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         _removeDestinationMarker();
       }
     });
+  }
+
+  Future<void> _closeAndClearRoute(bool isNavigating) async {
+    if (!mounted) return;
+    if (isNavigating) {
+      await _exitNavigationMode();
+    } else {
+      ref.read(mapNavigationProvider.notifier).clearRoute();
+      await _clearRoute();
+      await _removeDestinationMarker();
+    }
+  }
+
+  Future<void> _enterNavigationMode() async {
+    ref.read(mapNavigationProvider.notifier).startNavigation();
+
+    // Hide custom avatar annotation
+    _updateMyLocationAnnotation();
+
+    // Enable Mapbox location puck with heading bearing
+    await _mapboxMap?.location.updateSettings(
+      LocationComponentSettings(
+        enabled: true,
+        puckBearingEnabled: true,
+        pulsingEnabled: true,
+        showAccuracyRing: false,
+      ),
+    );
+
+    setStateWithViewportAnimation(() {
+      _isCameraFollowing = true;
+      _currentViewport = FollowPuckViewportState(
+        zoom: MapboxConstants.navigationZoom,
+        bearing: const FollowPuckViewportStateBearingHeading(),
+        pitch: MapboxConstants.navigationPitch,
+        padding: MbxEdgeInsets(
+          top: MapboxConstants.navigationPaddingTop,
+          left: 0.0,
+          bottom: 0.0,
+          right: 0.0,
+        ),
+      );
+    }, transition: const DefaultViewportTransition());
+  }
+
+  Future<void> _exitNavigationMode() async {
+    ref.read(mapNavigationProvider.notifier).stopNavigation();
+    _clearRoute();
+    _removeDestinationMarker();
+
+    // Disable Mapbox location puck
+    await _mapboxMap?.location.updateSettings(
+      LocationComponentSettings(enabled: false),
+    );
+
+    // Recreate custom avatar annotation
+    _updateMyLocationAnnotation();
+
+    setState(() {
+      _isCameraFollowing = false;
+      _currentViewport = const IdleViewportState();
+    });
+
+    _mapboxMap!.flyTo(
+      CameraOptions(center: _myLocationPoint, zoom: 15, pitch: 0),
+      MapAnimationOptions(duration: 1500),
+    );
+  }
+
+  void _reCenterCamera() {
+    setStateWithViewportAnimation(() {
+      _isCameraFollowing = true;
+      _currentViewport = FollowPuckViewportState(
+        zoom: MapboxConstants.navigationZoom,
+        bearing: const FollowPuckViewportStateBearingHeading(),
+        pitch: MapboxConstants.navigationPitch,
+        padding: MbxEdgeInsets(
+          top: MapboxConstants.navigationPaddingTop,
+          left: 0.0,
+          bottom: 0.0,
+          right: 0.0,
+        ),
+      );
+    }, transition: const DefaultViewportTransition());
+  }
+
+  void _onMapScroll(MapContentGestureContext context) {
+    final navState = ref.read(mapNavigationProvider);
+    if (navState.isNavigating && _isCameraFollowing) {
+      setState(() {
+        _isCameraFollowing = false;
+        _currentViewport = const IdleViewportState();
+      });
+    }
   }
 
   UserModel? _findFriend(String userId, List<UserModel> friendsList) {
@@ -761,10 +872,27 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   Future<void> _updateMyLocationAnnotation() async {
-    if (_myLocationPoint == null || _annotationManager == null) return;
+    if (!mounted || _myLocationPoint == null || _annotationManager == null)
+      return;
+
+    final isNavigating = ref.read(mapNavigationProvider).isNavigating;
+    if (isNavigating) {
+      if (_myLocationAnnotation != null) {
+        try {
+          await _annotationManager!.delete(_myLocationAnnotation!);
+        } catch (e) {
+          debugPrint('Error deleting myLocationAnnotation on navigation: $e');
+        } finally {
+          _myLocationAnnotation = null;
+        }
+      }
+      return;
+    }
 
     final profile = ref.read(currentProfileProvider).value;
     final iconBytes = await _getMyLocationIconBytes(profile);
+
+    if (!mounted) return;
 
     if (_myLocationAnnotation != null) {
       if (_myLocationAnnotation!.image != iconBytes) {
@@ -773,8 +901,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           await _annotationManager!.delete(_myLocationAnnotation!);
         } catch (e) {
           debugPrint('Error deleting myLocationAnnotation: $e');
+        } finally {
+          _myLocationAnnotation = null;
         }
-        _myLocationAnnotation = null;
       } else {
         // Only position changed
         if (_myLocationAnnotation!.geometry != _myLocationPoint) {
@@ -801,32 +930,43 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           iconAnchor: IconAnchor.CENTER,
         ),
       );
+    } catch (e) {
+      debugPrint('Error creating myLocationAnnotation: $e');
     } finally {
       _isCreatingAnnotation = false;
       // Re-sync if the point moved during creation
-      if (_myLocationAnnotation != null &&
+      if (mounted &&
+          _myLocationAnnotation != null &&
           _myLocationAnnotation!.geometry != _myLocationPoint) {
         _myLocationAnnotation!.geometry = _myLocationPoint!;
         _myLocationAnnotation!.image = iconBytes; // Preserve image
-        _annotationManager!.update(_myLocationAnnotation!);
+        try {
+          _annotationManager!.update(_myLocationAnnotation!);
+        } catch (e) {
+          debugPrint('Error updating myLocationAnnotation after create: $e');
+        }
       }
     }
   }
 
   Future<void> _reloadFriendAnnotations() async {
-    if (_annotationManager == null) return;
+    if (!mounted || _annotationManager == null) return;
 
     final friendLocations = ref.read(friendLocationsProvider);
     final friendsAsync = ref.read(friendsListProvider);
     final friendsList = friendsAsync.value ?? [];
 
-    // Delete existing friend annotations
-    final existing = await _annotationManager!.getAnnotations();
-    for (final annotation in existing) {
-      final textField = annotation.textField;
-      if (textField != null && textField.startsWith('friend_')) {
-        await _annotationManager!.delete(annotation);
+    try {
+      // Delete existing friend annotations
+      final existing = await _annotationManager!.getAnnotations();
+      for (final annotation in existing) {
+        final textField = annotation.textField;
+        if (textField != null && textField.startsWith('friend_')) {
+          await _annotationManager!.delete(annotation);
+        }
       }
+    } catch (e) {
+      debugPrint('Error clearing friend annotations: $e');
     }
     _friendAnnotations.clear();
 
@@ -860,12 +1000,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       }
     }
 
+    if (!mounted) return;
+
     if (optionsList.isNotEmpty) {
-      final annotations = await _annotationManager!.createMulti(optionsList);
-      for (int i = 0; i < userIds.length; i++) {
-        if (i < annotations.length && annotations[i] != null) {
-          _friendAnnotations[userIds[i]] = annotations[i]!;
+      try {
+        final annotations = await _annotationManager!.createMulti(optionsList);
+        for (int i = 0; i < userIds.length; i++) {
+          if (i < annotations.length && annotations[i] != null) {
+            _friendAnnotations[userIds[i]] = annotations[i]!;
+          }
         }
+      } catch (e) {
+        debugPrint('Error creating friend multi annotations: $e');
       }
     }
   }
@@ -932,157 +1078,211 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             onMapCreated: _onMapCreated,
             styleUri: MapboxConstants.darkStyleUrl,
             onLongTapListener: _onMapLongTap,
+            viewport: _currentViewport,
+            onScrollListener: _onMapScroll,
           ),
 
           // Top gradient overlay
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              height: 120,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.background.withValues(alpha: 0.8),
-                    AppColors.background.withValues(alpha: 0),
-                  ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+          if (!navState.isNavigating)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                height: 120,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.background.withValues(alpha: 0.8),
+                      AppColors.background.withValues(alpha: 0),
+                    ],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
                 ),
               ),
             ),
-          ),
 
           // Top bar
-          Positioned(
-            top: MediaQuery.paddingOf(context).top + 8,
-            left: AppSizes.md,
-            right: AppSizes.md,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                ShaderMask(
-                  shaderCallback: (bounds) =>
-                      AppColors.primaryGradient.createShader(bounds),
-                  child: const Text(
-                    'Halo',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
+          if (!navState.isNavigating)
+            Positioned(
+              top: MediaQuery.paddingOf(context).top + 8,
+              left: AppSizes.md,
+              right: AppSizes.md,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  ShaderMask(
+                    shaderCallback: (bounds) =>
+                        AppColors.primaryGradient.createShader(bounds),
+                    child: const Text(
+                      'Halo',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 28,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
-                ),
-                const Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 12),
-                    child: MapSearchBar(),
+                  const Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      child: MapSearchBar(),
+                    ),
                   ),
-                ),
-                if (!kIsWeb)
-                  GestureDetector(
-                    onTap: () =>
-                        ref.read(locationSharingProvider.notifier).toggle(),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSharing
-                            ? AppColors.online.withValues(alpha: 0.15)
-                            : AppColors.surfaceLight,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isSharing
-                              ? AppColors.online.withValues(alpha: 0.3)
-                              : AppColors.border,
+                  if (!kIsWeb)
+                    GestureDetector(
+                      onTap: () =>
+                          ref.read(locationSharingProvider.notifier).toggle(),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
                         ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isSharing ? Icons.location_on : Icons.location_off,
-                            size: 16,
+                        decoration: BoxDecoration(
+                          color: isSharing
+                              ? AppColors.online.withValues(alpha: 0.15)
+                              : AppColors.surfaceLight,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
                             color: isSharing
-                                ? AppColors.online
-                                : AppColors.textTertiary,
+                                ? AppColors.online.withValues(alpha: 0.3)
+                                : AppColors.border,
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            isSharing ? 'Bật' : 'Tắt',
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isSharing
+                                  ? Icons.location_on
+                                  : Icons.location_off,
+                              size: 16,
                               color: isSharing
                                   ? AppColors.online
                                   : AppColors.textTertiary,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 4),
+                            Text(
+                              isSharing ? 'Bật' : 'Tắt',
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: isSharing
+                                    ? AppColors.online
+                                    : AppColors.textTertiary,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
 
           // Weather chip — top-right below the search bar
-          Positioned(
-            right: AppSizes.md,
-            top: MediaQuery.paddingOf(context).top + 68,
-            child: const WeatherOverlay(),
-          ),
+          if (!navState.isNavigating)
+            Positioned(
+              right: AppSizes.md,
+              top: MediaQuery.paddingOf(context).top + 68,
+              child: const WeatherOverlay(),
+            ),
 
           // Map controls — right side
-          Positioned(
-            right: AppSizes.md,
-            bottom: AppSizes.xxl,
-            child: Column(
-              children: [
-                // Follow mode / location button
-                _FollowButton(mode: _followMode, onTap: _toggleFollowMode),
-                const SizedBox(height: 8),
+          if (!navState.isNavigating)
+            Positioned(
+              right: AppSizes.md,
+              bottom: AppSizes.xxl,
+              child: Column(
+                children: [
+                  // Follow mode / location button
+                  _FollowButton(mode: _followMode, onTap: _toggleFollowMode),
+                  const SizedBox(height: 8),
 
-                // Zoom controls
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.surface.withValues(alpha: 0.95),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.3),
-                        blurRadius: 8,
-                      ),
-                    ],
+                  // Zoom controls
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.surface.withValues(alpha: 0.95),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        _MapControlButton(
+                          icon: Icons.add,
+                          onTap: _zoomIn,
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(12),
+                          ),
+                        ),
+                        Container(height: 1, color: AppColors.divider),
+                        _MapControlButton(
+                          icon: Icons.remove,
+                          onTap: _zoomOut,
+                          borderRadius: const BorderRadius.vertical(
+                            bottom: Radius.circular(12),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Column(
-                    children: [
-                      _MapControlButton(
-                        icon: Icons.add,
-                        onTap: _zoomIn,
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(12),
+                ],
+              ),
+            ),
+
+          // Re-center button — shown when navigating and map is panned away
+          if (navState.isNavigating && !_isCameraFollowing)
+            Positioned(
+              bottom: AppSizes.xxl + 100,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: GestureDetector(
+                  onTap: _reCenterCamera,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.4),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
                         ),
-                      ),
-                      Container(height: 1, color: AppColors.divider),
-                      _MapControlButton(
-                        icon: Icons.remove,
-                        onTap: _zoomOut,
-                        borderRadius: const BorderRadius.vertical(
-                          bottom: Radius.circular(12),
+                      ],
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.navigation, color: Colors.white, size: 16),
+                        SizedBox(width: 6),
+                        Text(
+                          'Căn giữa',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
 
           // Navigation HUD — shown at bottom when a route is active
           if (navState.routeCoordinates != null)
@@ -1097,20 +1297,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 child: _NavigationHUD(
                   distance: navState.distance,
                   duration: navState.duration,
-                  onStart: () {
-                    // TODO: Implement navigation mode
-                  },
-                  onClose: () {
-                    ref.read(mapNavigationProvider.notifier).clearRoute();
-                    _clearRoute();
-                    _removeDestinationMarker();
-                  },
+                  isNavigating: navState.isNavigating,
+                  onStart: _enterNavigationMode,
+                  onClose: () => _closeAndClearRoute(navState.isNavigating),
                 ),
               ),
             ),
 
           // Compass button — appears when map is rotated from north
-          if (_showCompass || _followMode == FollowMode.compass)
+          if (!navState.isNavigating &&
+              (_showCompass || _followMode == FollowMode.compass))
             Positioned(
               right: AppSizes.md + 8,
               top: MediaQuery.paddingOf(context).top + 136,
@@ -1285,14 +1481,16 @@ class _MapControlButton extends StatelessWidget {
 class _NavigationHUD extends StatelessWidget {
   final double? distance;
   final double? duration;
-  final VoidCallback onStart;
-  final VoidCallback onClose;
+  final Future<void> Function() onStart;
+  final Future<void> Function() onClose;
+  final bool isNavigating;
 
   const _NavigationHUD({
     required this.onClose,
     required this.onStart,
     this.distance,
     this.duration,
+    this.isNavigating = false,
   });
 
   String _formatDistance(double? meters) {
@@ -1314,123 +1512,153 @@ class _NavigationHUD extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppColors.secondaryDark.withValues(alpha: 0.6),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.secondaryDark.withValues(alpha: 0.25),
-            blurRadius: 20,
-            spreadRadius: 2,
+    return BackButtonListener(
+      onBackButtonPressed: () async {
+        await onClose();
+        return true;
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.surface.withValues(alpha: 0.95),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: AppColors.secondaryDark.withValues(alpha: 0.6),
+            width: 1.5,
           ),
-          BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 12),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Route icon with secondaryDark accent
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: AppColors.secondaryDark.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppColors.secondaryDark.withValues(alpha: 0.4),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.secondaryDark.withValues(alpha: 0.25),
+              blurRadius: 20,
+              spreadRadius: 2,
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.4),
+              blurRadius: 12,
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Route icon with secondaryDark accent
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.secondaryDark.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.secondaryDark.withValues(alpha: 0.4),
+                ),
+              ),
+              child: const Icon(
+                Icons.directions,
+                color: AppColors.secondaryDark,
+                size: 22,
               ),
             ),
-            child: const Icon(
-              Icons.directions,
-              color: AppColors.secondaryDark,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 12),
+            const SizedBox(width: 12),
 
-          // Distance & duration
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _formatDistance(distance),
-                  style: const TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
+            // Distance & duration
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _formatDistance(distance),
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.access_time_rounded,
+                        size: 13,
+                        color: AppColors.secondaryDark,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _formatDuration(duration),
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // Start / Exit navigation button
+            if (!isNavigating) ...[
+              GestureDetector(
+                onTap: onStart,
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.navigation,
+                    color: AppColors.primary,
+                    size: 18,
                   ),
                 ),
-
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.access_time_rounded,
-                      size: 13,
-                      color: AppColors.secondaryDark,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      _formatDuration(duration),
-                      style: const TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: onClose,
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.close,
+                    color: AppColors.textSecondary,
+                    size: 18,
+                  ),
                 ),
-              ],
-            ),
-          ),
-
-          // Start navigation button
-          GestureDetector(
-            onTap: onStart,
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: AppColors.surfaceLight,
-                borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(
-                Icons.navigation,
-                color: AppColors.primary,
-                size: 18,
+            ] else
+              GestureDetector(
+                onTap: onClose,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Text(
+                    'Thoát',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
-
-          const SizedBox(width: 8),
-
-          // Close / exit navigation button
-          GestureDetector(
-            onTap: onClose,
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: AppColors.surfaceLight,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.close,
-                color: AppColors.textSecondary,
-                size: 18,
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
