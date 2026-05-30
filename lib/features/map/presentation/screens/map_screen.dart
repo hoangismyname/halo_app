@@ -392,7 +392,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     await _removeDestinationMarker();
     if (_annotationManager == null) return;
 
-    //TODO: Changeeeee textField to image Uint8list
+    //TODO: Change textField to image Uint8list
     _destinationAnnotation = await _annotationManager!.create(
       PointAnnotationOptions(
         geometry: point,
@@ -483,6 +483,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       center,
       radius + (isSelf ? 10 : 8),
       Paint()
+        ..isAntiAlias = true
         ..color = accentColor.withValues(alpha: 0.3)
         ..style = PaintingStyle.fill,
     );
@@ -492,6 +493,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       center,
       radius + (isSelf ? 6 : 4),
       Paint()
+        ..isAntiAlias = true
         ..color = accentColor
         ..style = PaintingStyle.fill,
     );
@@ -501,6 +503,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       center,
       radius,
       Paint()
+        ..isAntiAlias = true
         ..color = Colors.white
         ..style = PaintingStyle.stroke
         ..strokeWidth = 3,
@@ -509,109 +512,125 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     // Try to draw avatar image
     bool drewImage = false;
     if (avatarUrl != null && avatarUrl.isNotEmpty) {
+      ui.Image? uiImage;
       try {
+        // NEW CODE
         final imageProvider = NetworkImage(avatarUrl);
         final completer = Completer<ImageInfo>();
-        imageProvider
-            .resolve(ImageConfiguration.empty)
-            .addListener(
-              ImageStreamListener(
-                (info, _) {
-                  if (!completer.isCompleted) completer.complete(info);
-                },
-                onError: (error, stackTrace) {
-                  if (!completer.isCompleted) completer.completeError(error);
-                },
-              ),
-            );
-        final imageInfo = await completer.future.timeout(
-          const Duration(seconds: 3),
-          onTimeout: () => throw TimeoutException('Image load timeout'),
+        final stream = imageProvider.resolve(ImageConfiguration.empty);
+
+        final ImageStreamListener listener = ImageStreamListener(
+          (info, _) {
+            if (!completer.isCompleted) completer.complete(info);
+          },
+          onError: (error, stackTrace) {
+            if (!completer.isCompleted) completer.completeError(error);
+          },
         );
+
+        stream.addListener(listener);
+
+        final imageInfo = await completer.future
+            .timeout(
+              const Duration(seconds: 3),
+              onTimeout: () => throw TimeoutException('Image load timeout'),
+            )
+            .whenComplete(
+              () => stream.removeListener(listener),
+            ); // Hủy listener tránh leak
+
+        uiImage = imageInfo.image.clone();
 
         // Clip to circle
         canvas.save();
         canvas.clipPath(
           Path()..addOval(Rect.fromCircle(center: center, radius: radius)),
+          doAntiAlias: true,
         );
 
         canvas.drawImageRect(
-          imageInfo.image,
+          uiImage,
           Rect.fromLTWH(
             0,
             0,
-            imageInfo.image.width.toDouble(),
-            imageInfo.image.height.toDouble(),
+            uiImage.width.toDouble(),
+            uiImage.height.toDouble(),
           ),
           Rect.fromCircle(center: center, radius: radius),
-          Paint(),
+          Paint()
+            ..isAntiAlias = true
+            ..filterQuality = FilterQuality.high,
         );
         canvas.restore();
         drewImage = true;
       } catch (_) {
         // Fall through to initials
+      } finally {
+        uiImage?.dispose(); // Giải phóng bộ nhớ
       }
     }
 
-    // Fallback: draw initial letter
+    // Xử lý Fallback khi KHÔNG vẽ được ảnh (drewImage == false)
     if (!drewImage) {
-      final initial = (name.isNotEmpty ? name : '?')
-          .substring(0, 1)
-          .toUpperCase();
-
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: initial,
-          style: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: isSelf ? 32 : 28,
-            fontWeight: FontWeight.bold,
-            color: isSelf ? Colors.white : accentColor,
+      if (isSelf) {
+        // Draw person icon avatar (self marker)
+        final iconPainter = TextPainter(
+          text: TextSpan(
+            text: String.fromCharCode(Icons.person.codePoint),
+            style: const TextStyle(
+              fontFamily: 'MaterialIcons',
+              fontSize: 36,
+              color: Colors.white,
+              shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+            ),
           ),
-        ),
-        textDirection: TextDirection.ltr,
-      );
-      textPainter.layout();
+          textDirection: TextDirection.ltr,
+        );
+        iconPainter.layout();
+        iconPainter.paint(
+          canvas,
+          Offset(
+            center.dx - iconPainter.width / 2,
+            center.dy - iconPainter.height / 2,
+          ),
+        );
+      } else {
+        final initial = (name.isNotEmpty ? name : '?')
+            .substring(0, 1)
+            .toUpperCase();
 
-      if (!isSelf) {
+        // Nếu không phải user, vẽ một nền surface xám nhẹ
         canvas.drawCircle(
           center,
           radius,
           Paint()
+            ..isAntiAlias = true
             ..color = AppColors.surface
             ..style = PaintingStyle.fill,
         );
-      }
 
-      textPainter.paint(
-        canvas,
-        Offset(
-          center.dx - textPainter.width / 2,
-          center.dy - textPainter.height / 2,
-        ),
-      );
-    } else if (isSelf) {
-      // Draw person icon overlay on top of avatar for self marker
-      final iconPainter = TextPainter(
-        text: TextSpan(
-          text: String.fromCharCode(Icons.person.codePoint),
-          style: const TextStyle(
-            fontFamily: 'MaterialIcons',
-            fontSize: 20,
-            color: Colors.white,
-            shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+        // Vẽ chữ cái đầu
+        final textPainter = TextPainter(
+          text: TextSpan(
+            text: initial,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: accentColor,
+            ),
           ),
-        ),
-        textDirection: TextDirection.ltr,
-      );
-      iconPainter.layout();
-      iconPainter.paint(
-        canvas,
-        Offset(
-          center.dx - iconPainter.width / 2,
-          center.dy - iconPainter.height / 2,
-        ),
-      );
+          textDirection: TextDirection.ltr,
+        )..layout();
+
+        textPainter.paint(
+          canvas,
+          Offset(
+            center.dx - textPainter.width / 2,
+            center.dy - textPainter.height / 2,
+          ),
+        );
+      }
     }
 
     // Online indicator
@@ -624,6 +643,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         indicatorPos,
         7,
         Paint()
+          ..isAntiAlias = true
           ..color = AppColors.online
           ..style = PaintingStyle.fill,
       );
@@ -631,16 +651,27 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         indicatorPos,
         7,
         Paint()
+          ..isAntiAlias = true
           ..color = AppColors.background
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2,
       );
     }
 
+    // Xuất hình ảnh dạng Byte
     final picture = recorder.endRecording();
     final image = await picture.toImage(size, size);
     final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-    return byteData!.buffer.asUint8List();
+
+    // Giải phóng bộ nhớ
+    picture.dispose();
+    image.dispose();
+
+    if (byteData == null) {
+      throw StateError('Không thể render Canvas thành ByteData');
+    }
+
+    return byteData.buffer.asUint8List();
   }
 
   /// Creates the user's own location marker icon.
