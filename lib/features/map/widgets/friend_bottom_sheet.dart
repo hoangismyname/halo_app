@@ -148,7 +148,10 @@ class FriendBottomSheet extends ConsumerWidget {
                         .read(chatActionsProvider.notifier)
                         .getOrCreateDM(userId);
                     if (roomId != null && context.mounted) {
-                      context.push('/chat/$roomId');
+                      context.push(
+                        '/chat/$roomId',
+                        extra: {'friendName': name},
+                      );
                     }
                   },
                 ),

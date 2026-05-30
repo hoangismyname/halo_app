@@ -236,44 +236,70 @@ class _FriendTileState extends ConsumerState<_FriendTile> {
             ),
           ],
         ),
-        trailing: _isLoadingChat
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppColors.primary,
-                ),
-              )
-            : IconButton(
-                onPressed: () async {
-                  setState(() => _isLoadingChat = true);
-                  try {
-                    final roomId = await ref
-                        .read(chatActionsProvider.notifier)
-                        .getOrCreateDM(widget.friend.id);
-                    if (context.mounted) {
-                      if (roomId != null) {
-                        context.push('/chat/$roomId');
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Không thể mở cuộc trò chuyện.'),
-                            backgroundColor: AppColors.error,
-                          ),
-                        );
+        trailing: SizedBox(
+          width: 48,
+          height: 48,
+          child: Center(
+            child: _isLoadingChat
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.primary,
+                    ),
+                  )
+                : IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints:
+                        const BoxConstraints(), // Bỏ ràng buộc kích thước
+                    onPressed: () async {
+                      setState(() => _isLoadingChat = true);
+                      try {
+                        final roomId = await ref
+                            .read(chatActionsProvider.notifier)
+                            .getOrCreateDM(widget.friend.id);
+                        if (context.mounted) {
+                          if (roomId != null) {
+                            final friendName =
+                                widget.friend.displayName.isNotEmpty
+                                    ? widget.friend.displayName
+                                    : widget.friend.username;
+                            context.push(
+                              '/chat/$roomId',
+                              extra: {'friendName': friendName},
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Không thể mở cuộc trò chuyện.'),
+                                backgroundColor: AppColors.error,
+                              ),
+                            );
+                          }
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Lỗi: $e'),
+                              backgroundColor: AppColors.error,
+                              duration: const Duration(seconds: 5),
+                            ),
+                          );
+                        }
+                      } finally {
+                        if (mounted) setState(() => _isLoadingChat = false);
                       }
-                    }
-                  } finally {
-                    if (mounted) setState(() => _isLoadingChat = false);
-                  }
-                },
-                icon: const Icon(
-                  Icons.chat_bubble_outline,
-                  color: AppColors.primary,
-                  size: 20,
-                ),
-              ),
+                    },
+                    icon: const Icon(
+                      Icons.chat_bubble_outline,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                  ),
+          ),
+        ),
       ),
     );
   }

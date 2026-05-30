@@ -13,7 +13,11 @@ import '../../../../core/constants/app_sizes.dart';
 class ChatRoomScreen extends ConsumerStatefulWidget {
   final String roomId;
 
-  const ChatRoomScreen({super.key, required this.roomId});
+  /// Optional pre-cached friend name passed via route extra.
+  /// When provided, the screen skips the extra DB query to load the title.
+  final String? friendName;
+
+  const ChatRoomScreen({super.key, required this.roomId, this.friendName});
 
   @override
   ConsumerState<ChatRoomScreen> createState() => _ChatRoomScreenState();
@@ -22,7 +26,8 @@ class ChatRoomScreen extends ConsumerStatefulWidget {
 class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _showStickerPicker = false;
-  String _roomTitle = 'Chat';
+  late String _roomTitle;
+  bool _isLoadingMore = false;
 
   /// Tracks which user IDs are currently typing and when they started.
   final Map<String, DateTime> _typingUsers = {};
@@ -37,8 +42,39 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
   @override
   void initState() {
     super.initState();
-    _loadRoomTitle();
+    _roomTitle = widget.friendName ?? 'Chat';
+    if (widget.friendName == null) {
+      _loadRoomTitle();
+    }
     _subscribeToTyping();
+    _scrollController.addListener(_onScroll);
+  }
+
+  /// When user scrolls near the top, load more older messages.
+  void _onScroll() {
+    if (_isLoadingMore) return;
+
+    // Since the ListView is reversed, position 0 = bottom (newest).
+    // maxScrollExtent = top (oldest). We trigger load when near the top.
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    const threshold = 200.0;
+
+    if (currentScroll >= maxScroll - threshold) {
+      _loadMoreMessages();
+    }
+  }
+
+  Future<void> _loadMoreMessages() async {
+    final notifier = ref.read(chatRoomMessagesProvider(widget.roomId).notifier);
+    if (!notifier.hasMore) return;
+
+    setState(() => _isLoadingMore = true);
+    try {
+      await notifier.loadMore();
+    } finally {
+      if (mounted) setState(() => _isLoadingMore = false);
+    }
   }
 
   void _subscribeToTyping() {
@@ -80,6 +116,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     _debounceTimer?.cancel();
     _typingExpiryTimer?.cancel();
     _typingChannel?.unsubscribe();
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
   }
@@ -120,7 +157,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final messagesStream = ref.watch(messagesStreamProvider(widget.roomId));
+    final messagesAsync = ref.watch(chatRoomMessagesProvider(widget.roomId));
     final typingUsersCount = _typingUsers.length;
 
     return Scaffold(
@@ -161,7 +198,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
 
           // Messages list
           Expanded(
-            child: messagesStream.when(
+            child: messagesAsync.when(
               data: (messages) {
                 if (messages.isEmpty) {
                   return Center(
@@ -189,8 +226,27 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                   reverse: true,
                   padding: const EdgeInsets.symmetric(
                       horizontal: AppSizes.md, vertical: AppSizes.sm),
-                  itemCount: messages.length,
+                  // +1 for the loading indicator at the top
+                  itemCount: messages.length + (_isLoadingMore ? 1 : 0),
                   itemBuilder: (context, index) {
+                    // Loading indicator at the "top" (which is the last item
+                    // because the list is reversed)
+                    if (_isLoadingMore && index == messages.length) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Center(
+                          child: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+
                     final msg = messages[messages.length - 1 - index];
                     final senderId = msg['sender_id'] as String? ?? '';
                     final isMe = senderId == _currentUserId;
@@ -201,7 +257,10 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                     final metadata =
                         msg['metadata'] as Map<String, dynamic>? ?? {};
 
+                    final msgId = msg['id'] as String? ?? index.toString();
+
                     return MessageBubble(
+                      key: ValueKey(msgId),
                       content: content,
                       isMe: isMe,
                       messageType: type,

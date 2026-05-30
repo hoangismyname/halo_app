@@ -21,7 +21,7 @@ final class ChatRepositoryProvider
         argument: null,
         retry: null,
         name: r'chatRepositoryProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -48,4 +48,4 @@ final class ChatRepositoryProvider
   }
 }
 
-String _$chatRepositoryHash() => r'a2357be5498d7fc7172e1a4433153a600f1f0d8d';
+String _$chatRepositoryHash() => r'2ef1b620f16ce043a1e5072adefc3e734a6b9bff';

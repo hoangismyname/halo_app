@@ -70,6 +70,7 @@ class ChatListScreen extends ConsumerWidget {
           }
 
           return ListView.builder(
+            physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.symmetric(vertical: AppSizes.sm),
             itemCount: rooms.length,
             itemBuilder: (context, index) {

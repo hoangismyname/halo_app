@@ -369,12 +369,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   /// Removes the polyline from the map.
   Future<void> _clearRoute() async {
     if (_polylineManager != null && _routePolyline != null) {
+      final polyline = _routePolyline!;
+      _routePolyline = null;
       try {
-        await _polylineManager!.delete(_routePolyline!);
+        await _polylineManager!.delete(polyline);
       } catch (e) {
         debugPrint('❌ _clearRoute failed: $e');
-      } finally {
-        _routePolyline = null;
       }
     }
   }

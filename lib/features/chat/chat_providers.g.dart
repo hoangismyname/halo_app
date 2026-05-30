@@ -101,60 +101,62 @@ final class ChatRoomsWithLastMessageProvider
 String _$chatRoomsWithLastMessageHash() =>
     r'e5397e16ee981cab3d458df63c80e208f35b2000';
 
-/// Stream messages for a specific room
+/// Manages paginated message loading + realtime inserts for a single room.
+///
+/// - `build()`: fetches the most recent [_kPageSize] messages and subscribes
+///   to realtime INSERT events.
+/// - `loadMore()`: fetches the next [_kPageSize] older messages and prepends
+///   them to the current state.
+/// - Realtime inserts are appended to the end of the list automatically.
 
-@ProviderFor(messagesStream)
-final messagesStreamProvider = MessagesStreamFamily._();
+@ProviderFor(ChatRoomMessages)
+final chatRoomMessagesProvider = ChatRoomMessagesFamily._();
 
-/// Stream messages for a specific room
-
-final class MessagesStreamProvider
+/// Manages paginated message loading + realtime inserts for a single room.
+///
+/// - `build()`: fetches the most recent [_kPageSize] messages and subscribes
+///   to realtime INSERT events.
+/// - `loadMore()`: fetches the next [_kPageSize] older messages and prepends
+///   them to the current state.
+/// - Realtime inserts are appended to the end of the list automatically.
+final class ChatRoomMessagesProvider
     extends
-        $FunctionalProvider<
-          AsyncValue<List<Map<String, dynamic>>>,
-          List<Map<String, dynamic>>,
-          Stream<List<Map<String, dynamic>>>
-        >
-    with
-        $FutureModifier<List<Map<String, dynamic>>>,
-        $StreamProvider<List<Map<String, dynamic>>> {
-  /// Stream messages for a specific room
-  MessagesStreamProvider._({
-    required MessagesStreamFamily super.from,
+        $AsyncNotifierProvider<ChatRoomMessages, List<Map<String, dynamic>>> {
+  /// Manages paginated message loading + realtime inserts for a single room.
+  ///
+  /// - `build()`: fetches the most recent [_kPageSize] messages and subscribes
+  ///   to realtime INSERT events.
+  /// - `loadMore()`: fetches the next [_kPageSize] older messages and prepends
+  ///   them to the current state.
+  /// - Realtime inserts are appended to the end of the list automatically.
+  ChatRoomMessagesProvider._({
+    required ChatRoomMessagesFamily super.from,
     required String super.argument,
   }) : super(
          retry: null,
-         name: r'messagesStreamProvider',
+         name: r'chatRoomMessagesProvider',
          isAutoDispose: true,
          dependencies: null,
          $allTransitiveDependencies: null,
        );
 
   @override
-  String debugGetCreateSourceHash() => _$messagesStreamHash();
+  String debugGetCreateSourceHash() => _$chatRoomMessagesHash();
 
   @override
   String toString() {
-    return r'messagesStreamProvider'
+    return r'chatRoomMessagesProvider'
         ''
         '($argument)';
   }
 
   @$internal
   @override
-  $StreamProviderElement<List<Map<String, dynamic>>> $createElement(
-    $ProviderPointer pointer,
-  ) => $StreamProviderElement(pointer);
-
-  @override
-  Stream<List<Map<String, dynamic>>> create(Ref ref) {
-    final argument = this.argument as String;
-    return messagesStream(ref, argument);
-  }
+  ChatRoomMessages create() => ChatRoomMessages();
 
   @override
   bool operator ==(Object other) {
-    return other is MessagesStreamProvider && other.argument == argument;
+    return other is ChatRoomMessagesProvider && other.argument == argument;
   }
 
   @override
@@ -163,28 +165,85 @@ final class MessagesStreamProvider
   }
 }
 
-String _$messagesStreamHash() => r'2685755e320a82e1d6e9481f02982bab15cb009d';
+String _$chatRoomMessagesHash() => r'6a08613f24f6eeb6418347b4fa3882f701e58e7b';
 
-/// Stream messages for a specific room
+/// Manages paginated message loading + realtime inserts for a single room.
+///
+/// - `build()`: fetches the most recent [_kPageSize] messages and subscribes
+///   to realtime INSERT events.
+/// - `loadMore()`: fetches the next [_kPageSize] older messages and prepends
+///   them to the current state.
+/// - Realtime inserts are appended to the end of the list automatically.
 
-final class MessagesStreamFamily extends $Family
-    with $FunctionalFamilyOverride<Stream<List<Map<String, dynamic>>>, String> {
-  MessagesStreamFamily._()
+final class ChatRoomMessagesFamily extends $Family
+    with
+        $ClassFamilyOverride<
+          ChatRoomMessages,
+          AsyncValue<List<Map<String, dynamic>>>,
+          List<Map<String, dynamic>>,
+          FutureOr<List<Map<String, dynamic>>>,
+          String
+        > {
+  ChatRoomMessagesFamily._()
     : super(
         retry: null,
-        name: r'messagesStreamProvider',
+        name: r'chatRoomMessagesProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
         isAutoDispose: true,
       );
 
-  /// Stream messages for a specific room
+  /// Manages paginated message loading + realtime inserts for a single room.
+  ///
+  /// - `build()`: fetches the most recent [_kPageSize] messages and subscribes
+  ///   to realtime INSERT events.
+  /// - `loadMore()`: fetches the next [_kPageSize] older messages and prepends
+  ///   them to the current state.
+  /// - Realtime inserts are appended to the end of the list automatically.
 
-  MessagesStreamProvider call(String roomId) =>
-      MessagesStreamProvider._(argument: roomId, from: this);
+  ChatRoomMessagesProvider call(String roomId) =>
+      ChatRoomMessagesProvider._(argument: roomId, from: this);
 
   @override
-  String toString() => r'messagesStreamProvider';
+  String toString() => r'chatRoomMessagesProvider';
+}
+
+/// Manages paginated message loading + realtime inserts for a single room.
+///
+/// - `build()`: fetches the most recent [_kPageSize] messages and subscribes
+///   to realtime INSERT events.
+/// - `loadMore()`: fetches the next [_kPageSize] older messages and prepends
+///   them to the current state.
+/// - Realtime inserts are appended to the end of the list automatically.
+
+abstract class _$ChatRoomMessages
+    extends $AsyncNotifier<List<Map<String, dynamic>>> {
+  late final _$args = ref.$arg as String;
+  String get roomId => _$args;
+
+  FutureOr<List<Map<String, dynamic>>> build(String roomId);
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref =
+        this.ref
+            as $Ref<
+              AsyncValue<List<Map<String, dynamic>>>,
+              List<Map<String, dynamic>>
+            >;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<
+                AsyncValue<List<Map<String, dynamic>>>,
+                List<Map<String, dynamic>>
+              >,
+              AsyncValue<List<Map<String, dynamic>>>,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, () => build(_$args));
+  }
 }
 
 /// Chat actions notifier
@@ -215,7 +274,7 @@ final class ChatActionsProvider
   ChatActions create() => ChatActions();
 }
 
-String _$chatActionsHash() => r'40e638f5c228519fc14d42b26279382565fb4673';
+String _$chatActionsHash() => r'4fa5df8b691ee25fff38f34432a30901d1fc8bdc';
 
 /// Chat actions notifier
 

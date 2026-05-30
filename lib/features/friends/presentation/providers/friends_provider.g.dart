@@ -176,7 +176,7 @@ final class FriendsActionsProvider
   FriendsActions create() => FriendsActions();
 }
 
-String _$friendsActionsHash() => r'55d309f5d9c9c330c31cfd9b00fdc51186811da9';
+String _$friendsActionsHash() => r'691d353fba58c237f3b8127d620186587d379ac1';
 
 /// Friends actions (add, accept, remove)
 

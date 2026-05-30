@@ -249,10 +249,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/chat/:roomId',
         pageBuilder: (context, state) {
           final roomId = state.pathParameters['roomId']!;
+          // Extract optional friendName from route extra for instant title
+          final extra = state.extra as Map<String, dynamic>?;
+          final friendName = extra?['friendName'] as String?;
           return _buildSlideTransitionPage(
             context: context,
             state: state,
-            child: ChatRoomScreen(roomId: roomId),
+            child: ChatRoomScreen(roomId: roomId, friendName: friendName),
           );
         },
       ),
