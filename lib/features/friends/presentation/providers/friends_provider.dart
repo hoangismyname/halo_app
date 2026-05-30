@@ -71,6 +71,7 @@ class FriendsActions extends _$FriendsActions {
       final repo = ref.read(friendsRepositoryProvider);
       await repo.removeFriend(friendshipId);
       ref.invalidate(friendsListProvider);
+      ref.invalidate(pendingRequestsProvider);
     });
     return !state.hasError;
   }

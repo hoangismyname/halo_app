@@ -51,7 +51,7 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
               },
               child: LayoutBuilder(
                 builder: (context, constraints) => SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
+                  physics: const BouncingScrollPhysics(),
                   child: Container(
                     height: constraints.maxHeight,
                     alignment: Alignment.center,
@@ -95,7 +95,7 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
               ref.invalidate(statusesStreamProvider);
             },
             child: ListView.builder(
-              physics: const AlwaysScrollableScrollPhysics(),
+              physics: const BouncingScrollPhysics(),
               padding: const EdgeInsets.all(AppSizes.md),
               itemCount: filtered.length,
               itemBuilder: (context, index) {

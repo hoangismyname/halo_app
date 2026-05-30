@@ -872,8 +872,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   Future<void> _updateMyLocationAnnotation() async {
-    if (!mounted || _myLocationPoint == null || _annotationManager == null)
+    if (!mounted || _myLocationPoint == null || _annotationManager == null) {
       return;
+    }
 
     final isNavigating = ref.read(mapNavigationProvider).isNavigating;
     if (isNavigating) {
