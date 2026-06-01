@@ -47,7 +47,7 @@ final class FriendLocationsProvider
   }
 }
 
-String _$friendLocationsHash() => r'922931fc09dbcaff24cbd7fbc55ba11c7091de5c';
+String _$friendLocationsHash() => r'f0e51089aabf5032ec560d699ad6b8f2dbe350c8';
 
 /// Friend locations map: userId -> {lat, lng, timestamp}
 

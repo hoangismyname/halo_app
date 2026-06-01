@@ -5,6 +5,8 @@ import '../../../../core/constants/supabase_constants.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/location_repository.dart';
 
+import '../../../friends/presentation/providers/friends_provider.dart';
+
 part 'location_provider.g.dart';
 
 /// Friend locations map: userId -> {lat, lng, timestamp}
@@ -12,9 +14,30 @@ part 'location_provider.g.dart';
 class FriendLocations extends _$FriendLocations {
   @override
   Map<String, Map<String, dynamic>> build() {
+    final isSharing = ref.watch(locationSharingProvider);
+    if (!isSharing) return {};
+
+    final Map<String, Map<String, dynamic>> initialState = {};
+    
+    // Load last known locations from database
+    final friendsAsync = ref.watch(friendsListProvider);
+    final friends = friendsAsync.value ?? [];
+    
+    for (final friend in friends) {
+      if (friend.isLocationShared && friend.latitude != null && friend.longitude != null) {
+        initialState[friend.id] = {
+          'user_id': friend.id,
+          'latitude': friend.latitude,
+          'longitude': friend.longitude,
+          'timestamp': friend.locationUpdatedAt?.toIso8601String() ?? DateTime.now().toIso8601String(),
+          'precision': friend.locationPrecision,
+        };
+      }
+    }
+
     // Subscribe to location broadcasts
     final repo = ref.watch(locationRepositoryProvider);
-    repo.subscribeToLocations((payload) {
+    final channel = repo.subscribeToLocations((payload) {
       final userId = payload['user_id'] as String?;
       if (userId != null) {
         state = {
@@ -23,7 +46,12 @@ class FriendLocations extends _$FriendLocations {
         };
       }
     });
-    return {};
+
+    ref.onDispose(() {
+      channel.unsubscribe();
+    });
+
+    return initialState;
   }
 }
 

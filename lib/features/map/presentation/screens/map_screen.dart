@@ -22,6 +22,7 @@ import '../providers/map_navigation_provider.dart';
 import '../../widgets/destination_bottom_sheet.dart';
 import '../../widgets/friend_bottom_sheet.dart';
 import '../../widgets/map_search_bar.dart';
+import '../../widgets/map_3d_toggle_button.dart';
 import '../../../weather/presentation/widgets/weather_overlay.dart';
 
 /// Map camera follow mode (Google Maps style).
@@ -46,7 +47,8 @@ class MapScreen extends ConsumerStatefulWidget {
   ConsumerState<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends ConsumerState<MapScreen> {
+class _MapScreenState extends ConsumerState<MapScreen>
+    with TickerProviderStateMixin {
   MapboxMap? _mapboxMap;
   PointAnnotationManager? _annotationManager;
   PolylineAnnotationManager? _polylineManager;
@@ -67,6 +69,135 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   double _currentZoom = 13;
   Cancelable? _tapCancelable;
   Timer? _compassSyncTimer;
+  bool _is3DEnabled = false;
+
+  Future<void> _toggle3D() async {
+    if (_mapboxMap == null) return;
+    setState(() {
+      _is3DEnabled = !_is3DEnabled;
+    });
+
+    if (_is3DEnabled) {
+      try {
+        if (!(await _mapboxMap!.style.styleSourceExists('mapbox-dem'))) {
+          await _mapboxMap!.style.addSource(
+            RasterDemSource(
+              id: 'mapbox-dem',
+              url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+              tileSize: 512,
+              maxzoom: 14.0,
+            ),
+          );
+        }
+        await _mapboxMap!.style.setStyleTerrain(
+          '{"source": "mapbox-dem", "exaggeration": 1.5}',
+        );
+      } catch (e) {
+        debugPrint('Error enabling terrain: $e');
+      }
+
+      try {
+        final existing = await _mapboxMap!.style.styleLayerExists(
+          '3d-buildings',
+        );
+        if (!existing) {
+          final layer = FillExtrusionLayer(
+            id: '3d-buildings',
+            sourceId: 'composite',
+            sourceLayer: 'building',
+            minZoom: 12.0,
+            filter: ['==', 'extrude', 'true'],
+            fillExtrusionHeightExpression: [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              12,
+              0,
+              13,
+              ['get', 'height'],
+            ],
+            fillExtrusionBaseExpression: [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              12,
+              0,
+              13,
+              ['get', 'min_height'],
+            ],
+            fillExtrusionColor: 0xFFAAC6D4,
+            fillExtrusionOpacity: 0.8,
+            fillExtrusionAmbientOcclusionIntensity: 0.3,
+            fillExtrusionAmbientOcclusionRadius: 3.0,
+          );
+
+          if (_annotationManager != null) {
+            await _mapboxMap!.style.addLayerAt(
+              layer,
+              LayerPosition(below: _annotationManager!.id),
+            );
+          } else {
+            await _mapboxMap!.style.addLayer(layer);
+          }
+        }
+      } catch (e) {
+        debugPrint('Error enabling 3D buildings: $e');
+      }
+
+      try {
+        final existing = await _mapboxMap!.style.styleLayerExists('sky-layer');
+        if (!existing) {
+          await _mapboxMap!.style.addLayer(
+            SkyLayer(
+              id: 'sky-layer',
+              skyType: SkyType.ATMOSPHERE,
+              skyAtmosphereSun: [0.0, 90.0],
+              skyAtmosphereSunIntensity: 15.0,
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint('Error enabling sky layer: $e');
+      }
+
+      _mapboxMap!.flyTo(
+        CameraOptions(pitch: 60.0),
+        MapAnimationOptions(duration: 1000),
+      );
+    } else {
+      try {
+        await _mapboxMap!.style.setStyleTerrain('{}');
+      } catch (e) {
+        // TODO: handle error
+      }
+
+      try {
+        if (await _mapboxMap!.style.styleLayerExists('3d-buildings')) {
+          await _mapboxMap!.style.removeStyleLayer('3d-buildings');
+        }
+      } catch (e) {
+        // TODO: handle error
+      }
+
+      try {
+        if (await _mapboxMap!.style.styleLayerExists('sky-layer')) {
+          await _mapboxMap!.style.removeStyleLayer('sky-layer');
+        }
+      } catch (e) {
+        // TODO: handle error
+      }
+
+      _mapboxMap!.flyTo(
+        CameraOptions(pitch: 0.0),
+        MapAnimationOptions(duration: 1000),
+      );
+    }
+  }
+
+  // Animation for smooth user avatar movement
+  AnimationController? _myLocationAnimController;
+  geo.Point? _myLocationStartPoint;
+  geo.Point? _myLocationTargetPoint;
 
   /// Completer that fires once the map is created.
   final Completer<void> _mapCreated = Completer<void>();
@@ -102,9 +233,46 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   @override
   void initState() {
     super.initState();
+
+    _myLocationAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(
+        milliseconds: 1000,
+      ), // Match standard GPS update interval
+    );
+    _myLocationAnimController!.addListener(_onMyLocationAnimTick);
+
     // The background LocationTracker provider is already running independently.
     // We just listen for position updates and update the map UI.
     _maybeFlyToUserFromTracker();
+  }
+
+  void _onMyLocationAnimTick() {
+    if (_myLocationStartPoint == null ||
+        _myLocationTargetPoint == null ||
+        !mounted)
+      return;
+
+    final value = _myLocationAnimController!.value;
+    final startLat = _myLocationStartPoint!.coordinates.lat as double;
+    final startLng = _myLocationStartPoint!.coordinates.lng as double;
+    final targetLat = _myLocationTargetPoint!.coordinates.lat as double;
+    final targetLng = _myLocationTargetPoint!.coordinates.lng as double;
+
+    final currentLat = ui.lerpDouble(startLat, targetLat, value)!;
+    final currentLng = ui.lerpDouble(startLng, targetLng, value)!;
+
+    // Do NOT call setState here to avoid rebuilding the widget tree 60fps!
+    _myLocationPoint = geo.Point(
+      coordinates: geo.Position(currentLng, currentLat),
+    );
+
+    _updateMyLocationAnnotation();
+
+    // Also smoothly pan the camera if we are following
+    if (_hasFlownToUser) {
+      _maybeFollowUpdate();
+    }
   }
 
   /// Fly to the user's position on first build (re-entry).
@@ -121,16 +289,23 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   void _onPositionUpdate(geolocator.Position pos) {
     if (!mounted) return;
 
-    final point = geo.Point(
+    final targetPoint = geo.Point(
       coordinates: geo.Position(pos.longitude, pos.latitude),
     );
-    setState(() => _myLocationPoint = point);
 
     // Update heading for compass / bearing tracking
     _lastHeading = pos.heading > 0 ? pos.heading : null;
 
-    // ALWAYS update annotation
-    _updateMyLocationAnnotation();
+    if (_myLocationPoint == null) {
+      // First update: set immediately and update annotation
+      _myLocationPoint = targetPoint;
+      _updateMyLocationAnnotation();
+    } else {
+      // Subsequent updates: smoothly animate from current point to new point
+      _myLocationStartPoint = _myLocationPoint;
+      _myLocationTargetPoint = targetPoint;
+      _myLocationAnimController?.forward(from: 0.0);
+    }
 
     if (!_hasFlownToUser) {
       _hasFlownToUser = true;
@@ -142,8 +317,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           if (mounted) _flyToMyLocation();
         });
       }
-    } else {
-      // Map already rendered — optionally follow
+    } else if (_myLocationPoint == null) {
+      // Only do follow directly if we aren't animating.
+      // If we are animating, _onMyLocationAnimTick handles the follow.
       _maybeFollowUpdate();
     }
   }
@@ -285,6 +461,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   void dispose() {
     _tapCancelable?.cancel();
     _compassSyncTimer?.cancel();
+    _myLocationAnimController?.dispose();
     _removeDestinationMarker();
     _mapboxMap?.location.updateSettings(
       LocationComponentSettings(enabled: false),
@@ -959,30 +1136,37 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
   }
 
-  List<geo.Position> _createCirclePolygon(double lat, double lng, double radiusMeters) {
+  List<geo.Position> _createCirclePolygon(
+    double lat,
+    double lng,
+    double radiusMeters,
+  ) {
     final List<geo.Position> coords = [];
     const double earthRadius = 6371000;
     final double d = radiusMeters / earthRadius;
     final double latR = lat * math.pi / 180.0;
     final double lngR = lng * math.pi / 180.0;
-    
+
     for (int i = 0; i <= 36; i++) {
       final double bearing = i * 10 * math.pi / 180.0;
       final double lat2 = math.asin(
-        math.sin(latR) * math.cos(d) + 
-        math.cos(latR) * math.sin(d) * math.cos(bearing)
+        math.sin(latR) * math.cos(d) +
+            math.cos(latR) * math.sin(d) * math.cos(bearing),
       );
-      final double lng2 = lngR + math.atan2(
-        math.sin(bearing) * math.sin(d) * math.cos(latR),
-        math.cos(d) - math.sin(latR) * math.sin(lat2)
-      );
+      final double lng2 =
+          lngR +
+          math.atan2(
+            math.sin(bearing) * math.sin(d) * math.cos(latR),
+            math.cos(d) - math.sin(latR) * math.sin(lat2),
+          );
       coords.add(geo.Position(lng2 * 180.0 / math.pi, lat2 * 180.0 / math.pi));
     }
     return coords;
   }
 
   Future<void> _reloadFriendAnnotations() async {
-    if (!mounted || _annotationManager == null || _polygonManager == null) return;
+    if (!mounted || _annotationManager == null || _polygonManager == null)
+      return;
 
     final friendLocations = ref.read(friendLocationsProvider);
     final friendsAsync = ref.read(friendsListProvider);
@@ -1018,7 +1202,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       final lat = data['latitude'] as double?;
       final lng = data['longitude'] as double?;
       final precision = data['precision'] as String?;
-      
+
       if (lat != null && lng != null) {
         final friend = _findFriend(userId, friendsList);
         final isOnline = friend?.isOnline ?? false;
@@ -1038,7 +1222,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           ),
         );
         userIds.add(userId);
-        
+
         if (precision == 'relative') {
           // Draw a 1km radius polygon (approximating the 500m-1km fuzzing)
           final coords = _createCirclePolygon(lat, lng, 1000);
@@ -1048,7 +1232,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               fillColor: AppColors.primary.toARGB32(),
               fillOpacity: 0.15,
               fillOutlineColor: AppColors.primary.toARGB32(),
-            )
+            ),
           );
           polygonUserIds.add(userId);
         }
@@ -1069,7 +1253,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         debugPrint('Error creating friend multi annotations: $e');
       }
     }
-    
+
     if (polygonOptionsList.isNotEmpty) {
       try {
         final polygons = await _polygonManager!.createMulti(polygonOptionsList);
@@ -1292,9 +1476,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                           ),
                         ),
                         Container(height: 1, color: AppColors.divider),
-                        _MapControlButton(
-                          icon: Icons.remove,
-                          onTap: _zoomOut,
+                        _MapControlButton(icon: Icons.remove, onTap: _zoomOut),
+                        Container(height: 1, color: AppColors.divider),
+                        Map3DToggleButton(
+                          is3DEnabled: _is3DEnabled,
+                          onTap: _toggle3D,
                           borderRadius: const BorderRadius.vertical(
                             bottom: Radius.circular(12),
                           ),

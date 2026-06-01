@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "mapbox-flutter-patterns": {
+      "source": "mapbox/mapbox-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/mapbox-flutter-patterns/SKILL.md",
+      "computedHash": "f67df6d6160fc404b62b9b7888e40f0ec3f037e6d39358ad4f67751ba595696b"
+    },
     "supabase": {
       "source": "supabase/agent-skills",
       "sourceType": "github",

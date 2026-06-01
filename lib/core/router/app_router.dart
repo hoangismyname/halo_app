@@ -17,6 +17,8 @@ import '../../features/profile/presentation/screens/notification_screen.dart';
 import '../../features/profile/presentation/screens/privacy_screen.dart';
 import '../constants/app_colors.dart';
 
+final rootNavigatorKey = GlobalKey<NavigatorState>();
+
 // Shell for main navigation with IndexedStack — keeps all tab screens alive
 // so MapScreen is never disposed when switching to Chat, Friends, etc.
 // The MapWidget and its Geolocator stream stay running in the background.
@@ -165,6 +167,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   final isLoggedIn = ref.watch(isAuthenticatedProvider);
 
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: '/splash',
     redirect: (context, state) {
       final currentPath = state.matchedLocation;

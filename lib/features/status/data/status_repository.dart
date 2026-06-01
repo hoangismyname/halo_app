@@ -33,15 +33,23 @@ class StatusRepository {
         .eq('id', uid);
   }
 
-  Stream<List<Map<String, dynamic>>> streamStatuses() {
-    final uid = _userId;
-    if (uid == null) {
-      return Stream.value([]);
+  Stream<List<Map<String, dynamic>>> streamStatuses() async* {
+    if (_userId == null) {
+      yield [];
+      return;
     }
-    return _client
-        .from(SupabaseConstants.profilesTable)
-        .stream(primaryKey: ['id'])
-        .order('updated_at', ascending: false);
+
+    try {
+      // Lần tải đầu tiên từ View
+      yield await _client.from('friend_statuses').select().order('updated_at', ascending: false);
+
+      // Polling định kỳ mỗi 10 giây do View không hỗ trợ Supabase Realtime
+      yield* Stream.periodic(const Duration(seconds: 10)).asyncMap((_) async {
+        return await _client.from('friend_statuses').select().order('updated_at', ascending: false);
+      });
+    } catch (e) {
+      yield [];
+    }
   }
 }
 
