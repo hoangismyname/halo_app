@@ -165,7 +165,7 @@ final class ChatRoomMessagesProvider
   }
 }
 
-String _$chatRoomMessagesHash() => r'6a08613f24f6eeb6418347b4fa3882f701e58e7b';
+String _$chatRoomMessagesHash() => r'ec517e0e8dc11458422c1ae701dab9c77283006a';
 
 /// Manages paginated message loading + realtime inserts for a single room.
 ///

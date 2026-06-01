@@ -18,6 +18,8 @@ abstract class UserModel with _$UserModel {
     @JsonKey(name: 'location_updated_at') DateTime? locationUpdatedAt,
     @JsonKey(name: 'is_online') @Default(false) bool isOnline,
     @JsonKey(name: 'last_seen') DateTime? lastSeen,
+    @JsonKey(name: 'is_location_shared') @Default(true) bool isLocationShared,
+    @JsonKey(name: 'location_precision') @Default('absolute') String locationPrecision,
     @JsonKey(name: 'created_at') DateTime? createdAt,
     @JsonKey(name: 'updated_at') DateTime? updatedAt,
   }) = _UserModel;

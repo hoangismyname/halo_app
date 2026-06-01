@@ -120,10 +120,16 @@ class FriendBottomSheet extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _InfoChip(
-                icon: Icons.speed,
-                label: '${speed.toStringAsFixed(0)} km/h',
-              ),
+              if (locationData['precision'] == 'relative')
+                const _InfoChip(
+                  icon: Icons.my_location,
+                  label: 'Khu vực 1km',
+                )
+              else
+                _InfoChip(
+                  icon: Icons.speed,
+                  label: '${speed.toStringAsFixed(0)} km/h',
+                ),
               const SizedBox(width: AppSizes.sm),
               if (timestamp != null)
                 _InfoChip(

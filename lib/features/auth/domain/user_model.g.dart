@@ -23,6 +23,8 @@ _UserModel _$UserModelFromJson(Map<String, dynamic> json) => _UserModel(
   lastSeen: json['last_seen'] == null
       ? null
       : DateTime.parse(json['last_seen'] as String),
+  isLocationShared: json['is_location_shared'] as bool? ?? true,
+  locationPrecision: json['location_precision'] as String? ?? 'absolute',
   createdAt: json['created_at'] == null
       ? null
       : DateTime.parse(json['created_at'] as String),
@@ -45,6 +47,8 @@ Map<String, dynamic> _$UserModelToJson(_UserModel instance) =>
       'location_updated_at': instance.locationUpdatedAt?.toIso8601String(),
       'is_online': instance.isOnline,
       'last_seen': instance.lastSeen?.toIso8601String(),
+      'is_location_shared': instance.isLocationShared,
+      'location_precision': instance.locationPrecision,
       'created_at': instance.createdAt?.toIso8601String(),
       'updated_at': instance.updatedAt?.toIso8601String(),
     };

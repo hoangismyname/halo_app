@@ -135,20 +135,18 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     if (content.trim().isEmpty) return;
 
     _debounceTimer?.cancel();
-    await ref.read(chatActionsProvider.notifier).sendMessage(
-          roomId: widget.roomId,
-          content: content.trim(),
-        );
+    await ref
+        .read(chatActionsProvider.notifier)
+        .sendMessage(roomId: widget.roomId, content: content.trim());
 
     ref.invalidate(chatRoomsWithLastMessageProvider);
     _scrollToBottom();
   }
 
   Future<void> _sendSticker(String stickerUrl) async {
-    await ref.read(chatActionsProvider.notifier).sendSticker(
-          roomId: widget.roomId,
-          stickerUrl: stickerUrl,
-        );
+    await ref
+        .read(chatActionsProvider.notifier)
+        .sendSticker(roomId: widget.roomId, stickerUrl: stickerUrl);
 
     ref.invalidate(chatRoomsWithLastMessageProvider);
     setState(() => _showStickerPicker = false);
@@ -184,7 +182,9 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                   const _TypingDots(),
                   const SizedBox(width: 8),
                   Text(
-                    typingUsersCount == 1 ? 'đang nhập...' : 'có người đang nhập...',
+                    typingUsersCount == 1
+                        ? 'đang nhập...'
+                        : 'có người đang nhập...',
                     style: const TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 12,
@@ -205,9 +205,11 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.chat_bubble_outline,
-                            size: 48,
-                            color: AppColors.textTertiary.withValues(alpha: 0.3)),
+                        Icon(
+                          Icons.chat_bubble_outline,
+                          size: 48,
+                          color: AppColors.textTertiary.withValues(alpha: 0.3),
+                        ),
                         const SizedBox(height: AppSizes.md),
                         const Text(
                           'Bắt đầu cuộc trò chuyện!',
@@ -222,10 +224,13 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                 }
 
                 return ListView.builder(
+                  physics: const BouncingScrollPhysics(),
                   controller: _scrollController,
                   reverse: true,
                   padding: const EdgeInsets.symmetric(
-                      horizontal: AppSizes.md, vertical: AppSizes.sm),
+                    horizontal: AppSizes.md,
+                    vertical: AppSizes.sm,
+                  ),
                   // +1 for the loading indicator at the top
                   itemCount: messages.length + (_isLoadingMore ? 1 : 0),
                   itemBuilder: (context, index) {
@@ -277,8 +282,10 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                 child: CircularProgressIndicator(color: AppColors.primary),
               ),
               error: (error, _) => Center(
-                child: Text('Lỗi: $error',
-                    style: const TextStyle(color: AppColors.error)),
+                child: Text(
+                  'Lỗi: $error',
+                  style: const TextStyle(color: AppColors.error),
+                ),
               ),
             ),
           ),
@@ -313,7 +320,8 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
           final profile = member['profiles'] as Map<String, dynamic>?;
           if (profile != null && mounted) {
             setState(() {
-              _roomTitle = profile['display_name'] as String? ??
+              _roomTitle =
+                  profile['display_name'] as String? ??
                   profile['username'] as String? ??
                   'Chat';
             });
@@ -363,16 +371,19 @@ class _TypingDotsState extends State<_TypingDots>
           mainAxisSize: MainAxisSize.min,
           children: List.generate(3, (index) {
             final delay = index * 0.2;
-            final value =
-                ((_controller.value + delay) % 1.0);
-            final scale = (value < 0.5 ? value * 2 : (1 - value) * 2)
-                .clamp(0.0, 1.0);
+            final value = ((_controller.value + delay) % 1.0);
+            final scale = (value < 0.5 ? value * 2 : (1 - value) * 2).clamp(
+              0.0,
+              1.0,
+            );
             return Container(
               margin: const EdgeInsets.symmetric(horizontal: 1.5),
               width: 6,
               height: 6,
               decoration: BoxDecoration(
-                color: AppColors.textTertiary.withValues(alpha: 0.3 + scale * 0.7),
+                color: AppColors.textTertiary.withValues(
+                  alpha: 0.3 + scale * 0.7,
+                ),
                 shape: BoxShape.circle,
               ),
             );

@@ -191,6 +191,34 @@ class ProfileScreen extends ConsumerWidget {
                           }),
                         ),
                       ),
+                      if (isLocationSharing) ...[
+                        const Divider(height: 1, indent: 56, endIndent: 16),
+                        _SettingsTile(
+                          icon: Icons.my_location_outlined,
+                          title: 'Độ chính xác',
+                          trailing: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: profile.locationPrecision,
+                              icon: const Icon(Icons.arrow_drop_down, color: AppColors.textTertiary),
+                              style: const TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 14,
+                                color: AppColors.textSecondary,
+                              ),
+                              dropdownColor: AppColors.card,
+                              items: const [
+                                DropdownMenuItem(value: 'absolute', child: Text('Tuyệt đối')),
+                                DropdownMenuItem(value: 'relative', child: Text('Tương đối')),
+                              ],
+                              onChanged: (val) {
+                                if (val != null) {
+                                  ref.read(locationSharingProvider.notifier).updatePrecision(val);
+                                }
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
                       const Divider(height: 1, indent: 56, endIndent: 16),
                       _SettingsTile(
                         icon: Icons.notifications_outlined,

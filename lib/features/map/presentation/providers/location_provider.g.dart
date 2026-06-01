@@ -114,7 +114,7 @@ final class LocationSharingProvider
   }
 }
 
-String _$locationSharingHash() => r'a7a6da4316e515fafd6355985994254d1131f7b0';
+String _$locationSharingHash() => r'3482d28312effad3e0b40fe0a0cfec6dbf53ba45';
 
 /// Location sharing toggle
 

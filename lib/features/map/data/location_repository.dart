@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -51,8 +52,12 @@ class LocationRepository {
     }
   }
 
+  Position? _lastExactPosition;
+  double? _fuzzedLat;
+  double? _fuzzedLng;
+
   /// Start broadcasting location via Supabase Realtime
-  void startLocationSharing() {
+  void startLocationSharing({String precision = 'absolute'}) {
     if (kIsWeb) return; // Web doesn't share location
 
     _locationChannel = _client.channel(SupabaseConstants.locationChannel);
@@ -63,23 +68,73 @@ class LocationRepository {
         distanceFilter: 20, // Update every 20 meters
       ),
     ).listen((position) {
+      double lat = position.latitude;
+      double lng = position.longitude;
+      double? speed = position.speed;
+
+      if (precision == 'relative') {
+        _updateFuzzedLocation(position);
+        lat = _fuzzedLat!;
+        lng = _fuzzedLng!;
+        speed = 0.0; // Hide speed for privacy
+      }
+
       // Broadcast to other users
       _locationChannel?.sendBroadcastMessage(
         event: 'location',
         payload: {
           'user_id': _userId,
-          'latitude': position.latitude,
-          'longitude': position.longitude,
+          'latitude': lat,
+          'longitude': lng,
+          'precision': precision,
           'timestamp': DateTime.now().toIso8601String(),
-          'speed': position.speed,
+          'speed': speed,
         },
       );
 
       // Also update the database periodically
-      _updateLocationInDB(position.latitude, position.longitude);
+      _updateLocationInDB(lat, lng);
     });
 
     _locationChannel?.subscribe();
+  }
+
+  void _updateFuzzedLocation(Position currentPosition) {
+    if (_lastExactPosition == null || _fuzzedLat == null || _fuzzedLng == null) {
+      _generateNewFuzzedLocation(currentPosition);
+      return;
+    }
+    
+    // Calculate distance from last exact position
+    final distance = Geolocator.distanceBetween(
+      _lastExactPosition!.latitude,
+      _lastExactPosition!.longitude,
+      currentPosition.latitude,
+      currentPosition.longitude,
+    );
+    
+    // If moved more than 1km from where we last generated the offset, regenerate it
+    if (distance > 1000) {
+      _generateNewFuzzedLocation(currentPosition);
+    }
+  }
+
+  void _generateNewFuzzedLocation(Position position) {
+    _lastExactPosition = position;
+    final random = math.Random();
+    
+    // Random distance between 500m and 1000m
+    final distance = 500 + random.nextDouble() * 500;
+    // Random angle in radians
+    final angle = random.nextDouble() * 2 * math.pi;
+    
+    // 1 degree of latitude is ~111,320 meters
+    final latOffset = (distance * math.cos(angle)) / 111320.0;
+    // 1 degree of longitude depends on latitude
+    final lngOffset = (distance * math.sin(angle)) / (111320.0 * math.cos(position.latitude * math.pi / 180.0));
+    
+    _fuzzedLat = position.latitude + latOffset;
+    _fuzzedLng = position.longitude + lngOffset;
   }
 
   /// Stop sharing location
@@ -88,6 +143,9 @@ class LocationRepository {
     _positionSubscription = null;
     _locationChannel?.unsubscribe();
     _locationChannel = null;
+    _lastExactPosition = null;
+    _fuzzedLat = null;
+    _fuzzedLng = null;
   }
 
   /// Subscribe to friend location broadcasts

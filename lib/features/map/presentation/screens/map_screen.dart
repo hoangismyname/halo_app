@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -58,8 +59,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   String? _lastAvatarUrl;
   String? _lastName;
   bool _isCreatingAnnotation = false;
+  bool _imageNeedsRecreate = false;
   final Map<String, Uint8List> _friendIconBytes = {};
   final Map<String, PointAnnotation> _friendAnnotations = {};
+  PolygonAnnotationManager? _polygonManager;
+  final Map<String, PolygonAnnotation> _friendPolygons = {};
   double _currentZoom = 13;
   Cancelable? _tapCancelable;
   Timer? _compassSyncTimer;
@@ -288,6 +292,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _mapboxMap = null;
     _annotationManager = null;
     _polylineManager = null;
+    _polygonManager = null;
     super.dispose();
   }
 
@@ -829,6 +834,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _lastAvatarUrl = avatarUrl;
     _lastName = name;
     _myLocationIconBytes = await _createMyLocationIconBytes(profile);
+    // Signal that the annotation image must be recreated
+    _imageNeedsRecreate = true;
     return _myLocationIconBytes!;
   }
 
@@ -840,6 +847,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     // Create a separate polyline manager for routing (below point markers)
     _polylineManager = await mapboxMap.annotations
         .createPolylineAnnotationManager(below: _annotationManager!.id);
+
+    _polygonManager = await mapboxMap.annotations
+        .createPolygonAnnotationManager(below: _annotationManager!.id);
 
     // Signal that the map is ready
     if (!_mapCreated.isCompleted) {
@@ -896,8 +906,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     if (!mounted) return;
 
     if (_myLocationAnnotation != null) {
-      if (_myLocationAnnotation!.image != iconBytes) {
-        // Image changed: delete and recreate to avoid Mapbox caching/update issues
+      if (_imageNeedsRecreate) {
+        // Avatar image logically changed (URL or name changed):
+        // delete and recreate the annotation with the new icon.
+        _imageNeedsRecreate = false;
         try {
           await _annotationManager!.delete(_myLocationAnnotation!);
         } catch (e) {
@@ -906,15 +918,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           _myLocationAnnotation = null;
         }
       } else {
-        // Only position changed
-        if (_myLocationAnnotation!.geometry != _myLocationPoint) {
-          _myLocationAnnotation!.geometry = _myLocationPoint!;
-          try {
-            await _annotationManager!.update(_myLocationAnnotation!);
-          } catch (e) {
-            debugPrint('Error updating myLocationAnnotation: $e');
-            _myLocationAnnotation = null;
-          }
+        // Only position changed — update geometry in-place.
+        _myLocationAnnotation!.geometry = _myLocationPoint!;
+        try {
+          await _annotationManager!.update(_myLocationAnnotation!);
+        } catch (e) {
+          debugPrint('Error updating myLocationAnnotation: $e');
+          _myLocationAnnotation = null;
         }
         if (_myLocationAnnotation != null) return;
       }
@@ -940,9 +950,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           _myLocationAnnotation != null &&
           _myLocationAnnotation!.geometry != _myLocationPoint) {
         _myLocationAnnotation!.geometry = _myLocationPoint!;
-        _myLocationAnnotation!.image = iconBytes; // Preserve image
         try {
-          _annotationManager!.update(_myLocationAnnotation!);
+          await _annotationManager!.update(_myLocationAnnotation!);
         } catch (e) {
           debugPrint('Error updating myLocationAnnotation after create: $e');
         }
@@ -950,8 +959,30 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
   }
 
+  List<geo.Position> _createCirclePolygon(double lat, double lng, double radiusMeters) {
+    final List<geo.Position> coords = [];
+    const double earthRadius = 6371000;
+    final double d = radiusMeters / earthRadius;
+    final double latR = lat * math.pi / 180.0;
+    final double lngR = lng * math.pi / 180.0;
+    
+    for (int i = 0; i <= 36; i++) {
+      final double bearing = i * 10 * math.pi / 180.0;
+      final double lat2 = math.asin(
+        math.sin(latR) * math.cos(d) + 
+        math.cos(latR) * math.sin(d) * math.cos(bearing)
+      );
+      final double lng2 = lngR + math.atan2(
+        math.sin(bearing) * math.sin(d) * math.cos(latR),
+        math.cos(d) - math.sin(latR) * math.sin(lat2)
+      );
+      coords.add(geo.Position(lng2 * 180.0 / math.pi, lat2 * 180.0 / math.pi));
+    }
+    return coords;
+  }
+
   Future<void> _reloadFriendAnnotations() async {
-    if (!mounted || _annotationManager == null) return;
+    if (!mounted || _annotationManager == null || _polygonManager == null) return;
 
     final friendLocations = ref.read(friendLocationsProvider);
     final friendsAsync = ref.read(friendsListProvider);
@@ -966,20 +997,28 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           await _annotationManager!.delete(annotation);
         }
       }
+      for (final poly in _friendPolygons.values) {
+        await _polygonManager!.delete(poly);
+      }
     } catch (e) {
       debugPrint('Error clearing friend annotations: $e');
     }
     _friendAnnotations.clear();
+    _friendPolygons.clear();
 
     // Create new friend annotations
     final optionsList = <PointAnnotationOptions>[];
+    final polygonOptionsList = <PolygonAnnotationOptions>[];
     final userIds = <String>[];
+    final polygonUserIds = <String>[];
 
     for (final entry in friendLocations.entries) {
       final userId = entry.key;
       final data = entry.value;
       final lat = data['latitude'] as double?;
       final lng = data['longitude'] as double?;
+      final precision = data['precision'] as String?;
+      
       if (lat != null && lng != null) {
         final friend = _findFriend(userId, friendsList);
         final isOnline = friend?.isOnline ?? false;
@@ -995,9 +1034,24 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             textField: 'friend_$userId',
             iconSize: 1.0,
             iconAnchor: IconAnchor.CENTER,
+            iconOpacity: precision == 'relative' ? 0.6 : 1.0,
           ),
         );
         userIds.add(userId);
+        
+        if (precision == 'relative') {
+          // Draw a 1km radius polygon (approximating the 500m-1km fuzzing)
+          final coords = _createCirclePolygon(lat, lng, 1000);
+          polygonOptionsList.add(
+            PolygonAnnotationOptions(
+              geometry: geo.Polygon(coordinates: [coords]),
+              fillColor: AppColors.primary.toARGB32(),
+              fillOpacity: 0.15,
+              fillOutlineColor: AppColors.primary.toARGB32(),
+            )
+          );
+          polygonUserIds.add(userId);
+        }
       }
     }
 
@@ -1013,6 +1067,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         }
       } catch (e) {
         debugPrint('Error creating friend multi annotations: $e');
+      }
+    }
+    
+    if (polygonOptionsList.isNotEmpty) {
+      try {
+        final polygons = await _polygonManager!.createMulti(polygonOptionsList);
+        for (int i = 0; i < polygonUserIds.length; i++) {
+          if (i < polygons.length && polygons[i] != null) {
+            _friendPolygons[polygonUserIds[i]] = polygons[i]!;
+          }
+        }
+      } catch (e) {
+        debugPrint('Error creating friend multi polygons: $e');
       }
     }
   }
