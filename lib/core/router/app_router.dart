@@ -15,6 +15,7 @@ import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/profile/presentation/screens/edit_profile_screen.dart';
 import '../../features/profile/presentation/screens/notification_screen.dart';
 import '../../features/profile/presentation/screens/privacy_screen.dart';
+import '../../features/map/presentation/screens/map_search_screen.dart';
 import '../constants/app_colors.dart';
 
 final rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -240,6 +241,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
 
       // Full-screen routes (no bottom nav)
+      GoRoute(
+        path: '/map-search',
+        pageBuilder: (context, state) => _buildSlideTransitionPage(
+          context: context,
+          state: state,
+          child: const MapSearchScreen(),
+        ),
+      ),
       GoRoute(
         path: '/add-friend',
         pageBuilder: (context, state) => _buildSlideTransitionPage(

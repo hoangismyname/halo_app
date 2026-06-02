@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart' as geolocator;
 import 'package:halo/core/utils/position_extensions.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart'
@@ -24,6 +25,7 @@ import '../../widgets/friend_bottom_sheet.dart';
 import '../../widgets/map_search_bar.dart';
 import '../../widgets/map_3d_toggle_button.dart';
 import '../../../weather/presentation/widgets/weather_overlay.dart';
+import '../../domain/map_search_result.dart';
 
 /// Map camera follow mode (Google Maps style).
 enum FollowMode {
@@ -1377,10 +1379,55 @@ class _MapScreenState extends ConsumerState<MapScreen>
                       ),
                     ),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12),
-                      child: MapSearchBar(),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: MapSearchBar(
+                        onTap: () async {
+                          final result = await context.push('/map-search');
+                          if (result != null && result is MapSearchResult) {
+                            // Close destination marker and route if any
+                            _removeDestinationMarker();
+                            ref.read(mapNavigationProvider.notifier).clearRoute();
+                            
+                            final point = geo.Point(
+                              coordinates: geo.Position(result.lon, result.lat),
+                            );
+                            _addDestinationMarker(point);
+                            _mapboxMap?.flyTo(
+                              CameraOptions(
+                                center: point,
+                                zoom: 15,
+                                pitch: 0,
+                                bearing: 0,
+                              ),
+                              MapAnimationOptions(duration: 1500),
+                            );
+                            
+                            // Show destination bottom sheet
+                            if (!context.mounted) return;
+                            showModalBottomSheet(
+                              context: context,
+                              backgroundColor: Colors.transparent,
+                              builder: (ctx) => BackButtonListener(
+                                onBackButtonPressed: () async {
+                                  Navigator.of(ctx).pop();
+                                  return true;
+                                },
+                                child: DestinationBottomSheet(
+                                  latitude: result.lat,
+                                  longitude: result.lon,
+                                ),
+                              ),
+                            ).whenComplete(() {
+                              final navState = ref.read(mapNavigationProvider);
+                              if (navState.routeCoordinates == null) {
+                                _removeDestinationMarker();
+                              }
+                            });
+                          }
+                        },
+                      ),
                     ),
                   ),
                   if (!kIsWeb)

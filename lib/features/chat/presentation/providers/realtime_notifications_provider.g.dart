@@ -42,7 +42,7 @@ final class RealtimeNotificationsProvider
 }
 
 String _$realtimeNotificationsHash() =>
-    r'79920ead4ffaabeef2701ed6dd9d193200d81632';
+    r'dfa6e8091fe1eaaa451b1d6cbc613afb4f72b106';
 
 abstract class _$RealtimeNotifications extends $Notifier<void> {
   void build();
