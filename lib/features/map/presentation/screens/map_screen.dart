@@ -79,121 +79,28 @@ class _MapScreenState extends ConsumerState<MapScreen>
       _is3DEnabled = !_is3DEnabled;
     });
 
-    if (_is3DEnabled) {
-      try {
-        if (!(await _mapboxMap!.style.styleSourceExists('mapbox-dem'))) {
-          await _mapboxMap!.style.addSource(
-            RasterDemSource(
-              id: 'mapbox-dem',
-              url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
-              tileSize: 512,
-              maxzoom: 14.0,
-            ),
-          );
-        }
-        await _mapboxMap!.style.setStyleTerrain(
-          '{"source": "mapbox-dem", "exaggeration": 1.5}',
-        );
-      } catch (e) {
-        debugPrint('Error enabling terrain: $e');
-      }
-
-      try {
-        final existing = await _mapboxMap!.style.styleLayerExists(
-          '3d-buildings',
-        );
-        if (!existing) {
-          final layer = FillExtrusionLayer(
-            id: '3d-buildings',
-            sourceId: 'composite',
-            sourceLayer: 'building',
-            minZoom: 12.0,
-            filter: ['==', 'extrude', 'true'],
-            fillExtrusionHeightExpression: [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              12,
-              0,
-              13,
-              ['get', 'height'],
-            ],
-            fillExtrusionBaseExpression: [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              12,
-              0,
-              13,
-              ['get', 'min_height'],
-            ],
-            fillExtrusionColor: 0xFFAAC6D4,
-            fillExtrusionOpacity: 0.8,
-            fillExtrusionAmbientOcclusionIntensity: 0.3,
-            fillExtrusionAmbientOcclusionRadius: 3.0,
-          );
-
-          if (_annotationManager != null) {
-            await _mapboxMap!.style.addLayerAt(
-              layer,
-              LayerPosition(below: _annotationManager!.id),
-            );
-          } else {
-            await _mapboxMap!.style.addLayer(layer);
-          }
-        }
-      } catch (e) {
-        debugPrint('Error enabling 3D buildings: $e');
-      }
-
-      try {
-        final existing = await _mapboxMap!.style.styleLayerExists('sky-layer');
-        if (!existing) {
-          await _mapboxMap!.style.addLayer(
-            SkyLayer(
-              id: 'sky-layer',
-              skyType: SkyType.ATMOSPHERE,
-              skyAtmosphereSun: [0.0, 90.0],
-              skyAtmosphereSunIntensity: 15.0,
-            ),
-          );
-        }
-      } catch (e) {
-        debugPrint('Error enabling sky layer: $e');
-      }
-
-      _mapboxMap!.flyTo(
-        CameraOptions(pitch: 60.0),
-        MapAnimationOptions(duration: 1000),
+    try {
+      // Bật hiển thị 3D cho cây cối (mặc định dạng mô hình khối 3D tại các công viên lớn)
+      await _mapboxMap!.style.setStyleImportConfigProperty(
+        "basemap",
+        "show3dLandmarks",
+        _is3DEnabled,
       );
-    } else {
-      try {
-        await _mapboxMap!.style.setStyleTerrain('{}');
-      } catch (e) {
-        // TODO: handle error
-      }
 
-      try {
-        if (await _mapboxMap!.style.styleLayerExists('3d-buildings')) {
-          await _mapboxMap!.style.removeStyleLayer('3d-buildings');
-        }
-      } catch (e) {
-        // TODO: handle error
-      }
-
-      try {
-        if (await _mapboxMap!.style.styleLayerExists('sky-layer')) {
-          await _mapboxMap!.style.removeStyleLayer('sky-layer');
-        }
-      } catch (e) {
-        // TODO: handle error
-      }
-
-      _mapboxMap!.flyTo(
-        CameraOptions(pitch: 0.0),
-        MapAnimationOptions(duration: 1000),
+      // Kích hoạt hiển thị chi tiết thảm thực vật và phân tách các vùng rừng/hồ nước
+      await _mapboxMap!.style.setStyleImportConfigProperty(
+        "basemap",
+        "show3dObjects",
+        _is3DEnabled,
       );
+    } catch (e) {
+      debugPrint('Error enabling 3D map: $e');
     }
+    // Hiệu ứng mượt mà thay đổi góc nhìn camera
+    _mapboxMap!.flyTo(
+      CameraOptions(pitch: _is3DEnabled ? 60.0 : 0.0),
+      MapAnimationOptions(duration: 1000),
+    );
   }
 
   // Animation for smooth user avatar movement
@@ -252,8 +159,9 @@ class _MapScreenState extends ConsumerState<MapScreen>
   void _onMyLocationAnimTick() {
     if (_myLocationStartPoint == null ||
         _myLocationTargetPoint == null ||
-        !mounted)
+        !mounted) {
       return;
+    }
 
     final value = _myLocationAnimController!.value;
     final startLat = _myLocationStartPoint!.coordinates.lat as double;
@@ -394,13 +302,6 @@ class _MapScreenState extends ConsumerState<MapScreen>
       ),
       MapAnimationOptions(duration: 1500),
     );
-    // _mapboxMap!.setCamera(
-    //   CameraOptions(
-    //     center: _myLocationPoint,
-    //     zoom: _currentZoom,
-    //     bearing: _followMode == FollowMode.compass ? (_lastHeading ?? 0) : 0,
-    //   ),
-    // );
   }
 
   /// Rotate the map to the given bearing.
@@ -1167,8 +1068,9 @@ class _MapScreenState extends ConsumerState<MapScreen>
   }
 
   Future<void> _reloadFriendAnnotations() async {
-    if (!mounted || _annotationManager == null || _polygonManager == null)
+    if (!mounted || _annotationManager == null || _polygonManager == null) {
       return;
+    }
 
     final friendLocations = ref.read(friendLocationsProvider);
     final friendsAsync = ref.read(friendsListProvider);
@@ -1330,7 +1232,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
           MapWidget(
             key: const ValueKey('halo_map'),
             onMapCreated: _onMapCreated,
-            styleUri: MapboxConstants.darkStyleUrl,
+            styleUri: MapboxConstants.standardStyle,
             onLongTapListener: _onMapLongTap,
             viewport: _currentViewport,
             onScrollListener: _onMapScroll,
@@ -1388,8 +1290,10 @@ class _MapScreenState extends ConsumerState<MapScreen>
                           if (result != null && result is MapSearchResult) {
                             // Close destination marker and route if any
                             _removeDestinationMarker();
-                            ref.read(mapNavigationProvider.notifier).clearRoute();
-                            
+                            ref
+                                .read(mapNavigationProvider.notifier)
+                                .clearRoute();
+
                             final point = geo.Point(
                               coordinates: geo.Position(result.lon, result.lat),
                             );
@@ -1403,7 +1307,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
                               ),
                               MapAnimationOptions(duration: 1500),
                             );
-                            
+
                             // Show destination bottom sheet
                             if (!context.mounted) return;
                             showModalBottomSheet(

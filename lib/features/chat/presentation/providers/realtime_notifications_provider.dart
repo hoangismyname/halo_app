@@ -56,8 +56,11 @@ class RealtimeNotifications extends _$RealtimeNotifications {
             final messageType = newRecord['message_type'] as String? ?? 'text';
 
             // Ignore messages sent by ourselves
-            if (senderId == null || senderId == currentUserId || roomId == null)
+            if (senderId == null ||
+                senderId == currentUserId ||
+                roomId == null) {
               return;
+            }
 
             // Fetch sender's profile
             try {
@@ -123,8 +126,9 @@ class RealtimeNotifications extends _$RealtimeNotifications {
             // Check if it's a pending request sent to the current user
             if (userId == null ||
                 friendId != currentUserId ||
-                status != 'pending')
+                status != 'pending') {
               return;
+            }
 
             // Fetch sender's profile
             try {
