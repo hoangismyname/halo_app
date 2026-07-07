@@ -6,12 +6,11 @@ class MapboxConstants {
 
   static String get accessToken => Env.get('MAPBOX_API_KEY');
 
-  // Map style
-  static const String standardStyle = 'mapbox://styles/mapbox/standard';
-  static const String darkStyleUrl = 'mapbox://styles/mapbox/dark-v11';
-  static const String streetsStyleUrl = 'mapbox://styles/mapbox/streets-v12';
-  static const String satelliteStyleUrl =
-      'mapbox://styles/mapbox/satellite-streets-v12';
+  // Light presets
+  static const String dawnLightPreset = 'dawn';
+  static const String dayLightPreset = 'day';
+  static const String duskLightPreset = 'dusk';
+  static const String nightLightPreset = 'night';
 
   // Camera options
   static const double cameraVerticalPadding = 100.0;

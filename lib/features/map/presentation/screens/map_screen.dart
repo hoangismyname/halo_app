@@ -80,14 +80,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
     });
 
     try {
-      // Bật hiển thị 3D cho cây cối (mặc định dạng mô hình khối 3D tại các công viên lớn)
-      await _mapboxMap!.style.setStyleImportConfigProperty(
-        "basemap",
-        "show3dLandmarks",
-        _is3DEnabled,
-      );
-
-      // Kích hoạt hiển thị chi tiết thảm thực vật và phân tách các vùng rừng/hồ nước
+      // Kích hoạt hiển thị chi tiết 3d
       await _mapboxMap!.style.setStyleImportConfigProperty(
         "basemap",
         "show3dObjects",
@@ -101,6 +94,37 @@ class _MapScreenState extends ConsumerState<MapScreen>
       CameraOptions(pitch: _is3DEnabled ? 60.0 : 0.0),
       MapAnimationOptions(duration: 1000),
     );
+  }
+
+  Future<void> _setAutoLightingByTime() async {
+    final int currentHour = DateTime.now().hour;
+
+    // Logic phân chia khoảng thời gian trong ngày
+    if (currentHour >= 6 && currentHour < 17) {
+      await _mapboxMap!.style.setStyleImportConfigProperty(
+        "basemap",
+        "lightPreset",
+        MapboxConstants.dayLightPreset,
+      );
+    } else if (currentHour >= 17 && currentHour < 18) {
+      await _mapboxMap!.style.setStyleImportConfigProperty(
+        "basemap",
+        "lightPreset",
+        MapboxConstants.duskLightPreset,
+      );
+    } else if (currentHour >= 18 || currentHour < 5) {
+      await _mapboxMap!.style.setStyleImportConfigProperty(
+        "basemap",
+        "lightPreset",
+        MapboxConstants.nightLightPreset,
+      );
+    } else {
+      await _mapboxMap!.style.setStyleImportConfigProperty(
+        "basemap",
+        "lightPreset",
+        MapboxConstants.dawnLightPreset,
+      );
+    }
   }
 
   // Animation for smooth user avatar movement
@@ -921,6 +945,10 @@ class _MapScreenState extends ConsumerState<MapScreen>
 
   Future<void> _onMapCreated(MapboxMap mapboxMap) async {
     _mapboxMap = mapboxMap;
+
+    // TODO: make it run on background when open and load app
+    _setAutoLightingByTime();
+
     _annotationManager = await mapboxMap.annotations
         .createPointAnnotationManager();
 
@@ -1232,7 +1260,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
           MapWidget(
             key: const ValueKey('halo_map'),
             onMapCreated: _onMapCreated,
-            styleUri: MapboxConstants.standardStyle,
+            styleUri: MapboxStyles.STANDARD,
             onLongTapListener: _onMapLongTap,
             viewport: _currentViewport,
             onScrollListener: _onMapScroll,
