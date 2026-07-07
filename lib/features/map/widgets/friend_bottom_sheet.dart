@@ -7,6 +7,8 @@ import '../../../core/widgets/halo_avatar.dart';
 import '../../../core/widgets/halo_button.dart';
 import '../../auth/domain/user_model.dart';
 import '../../chat/chat_providers.dart';
+import '../presentation/providers/map_navigation_provider.dart';
+import '../presentation/providers/location_tracker.dart';
 
 class FriendBottomSheet extends ConsumerWidget {
   final String userId;
@@ -118,10 +120,16 @@ class FriendBottomSheet extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _InfoChip(
-                icon: Icons.speed,
-                label: '${speed.toStringAsFixed(0)} km/h',
-              ),
+              if (locationData['precision'] == 'relative')
+                const _InfoChip(
+                  icon: Icons.my_location,
+                  label: 'Khu vực 1km',
+                )
+              else
+                _InfoChip(
+                  icon: Icons.speed,
+                  label: '${speed.toStringAsFixed(0)} km/h',
+                ),
               const SizedBox(width: AppSizes.sm),
               if (timestamp != null)
                 _InfoChip(
@@ -146,7 +154,10 @@ class FriendBottomSheet extends ConsumerWidget {
                         .read(chatActionsProvider.notifier)
                         .getOrCreateDM(userId);
                     if (roomId != null && context.mounted) {
-                      context.push('/chat/$roomId');
+                      context.push(
+                        '/chat/$roomId',
+                        extra: {'friendName': name},
+                      );
                     }
                   },
                 ),
@@ -158,6 +169,35 @@ class FriendBottomSheet extends ConsumerWidget {
                   icon: Icons.directions,
                   outlined: true,
                   onPressed: () {
+                    final myPos = ref.read(locationTrackerProvider);
+                    final friendLat =
+                        locationData['latitude'] as double?;
+                    final friendLng =
+                        locationData['longitude'] as double?;
+
+                    if (myPos == null ||
+                        friendLat == null ||
+                        friendLng == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                              'Không xác định được vị trí. Vui lòng thử lại.'),
+                          backgroundColor: AppColors.error,
+                        ),
+                      );
+                      return;
+                    }
+
+                    ref
+                        .read(mapNavigationProvider.notifier)
+                        .fetchRoute(
+                          startLat: myPos.latitude,
+                          startLng: myPos.longitude,
+                          endLat: friendLat,
+                          endLng: friendLng,
+                          friendId: userId,
+                        );
+
                     Navigator.pop(context);
                   },
                 ),

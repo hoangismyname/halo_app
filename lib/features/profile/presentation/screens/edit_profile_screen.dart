@@ -20,12 +20,30 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _displayNameController = TextEditingController();
   final _bioController = TextEditingController();
   bool _initialized = false;
+  bool _uploading = false;
 
   @override
   void dispose() {
     _displayNameController.dispose();
     _bioController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickAndUploadAvatar() async {
+    setState(() => _uploading = true);
+    try {
+      final url = await ref.read(profileProvider.notifier).uploadAvatar();
+      if (url != null && mounted) {
+        ref.invalidate(currentProfileProvider);
+        context.showSnackBar('Đã cập nhật ảnh đại diện!');
+      }
+    } catch (e) {
+      if (mounted) {
+        context.showSnackBar('Lỗi cập nhật ảnh: $e', isError: true);
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
   }
 
   @override
@@ -45,8 +63,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         data: (profile) {
           if (profile == null) {
             return const Center(
-              child: Text('Không tìm thấy hồ sơ',
-                  style: TextStyle(color: AppColors.textTertiary)),
+              child: Text(
+                'Không tìm thấy hồ sơ',
+                style: TextStyle(color: AppColors.textTertiary),
+              ),
             );
           }
 
@@ -60,33 +80,50 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             padding: const EdgeInsets.all(AppSizes.lg),
             child: Column(
               children: [
-                Stack(
-                  children: [
-                    HaloAvatar(
-                      imageUrl: profile.avatarUrl,
-                      name: profile.displayName.isNotEmpty
-                          ? profile.displayName
-                          : profile.username,
-                      size: AppSizes.avatarXxl,
-                      showBorder: true,
-                    ),
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          gradient: AppColors.primaryGradient,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                              color: AppColors.background, width: 3),
-                        ),
-                        child: const Icon(Icons.camera_alt,
-                            size: 16, color: Colors.white),
+                GestureDetector(
+                  onTap: _uploading ? null : _pickAndUploadAvatar,
+                  child: Stack(
+                    children: [
+                      HaloAvatar(
+                        imageUrl: profile.avatarUrl,
+                        name: profile.displayName.isNotEmpty
+                            ? profile.displayName
+                            : profile.username,
+                        size: AppSizes.avatarXxl,
+                        showBorder: true,
                       ),
-                    ),
-                  ],
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            gradient: AppColors.primaryGradient,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.background,
+                              width: 3,
+                            ),
+                          ),
+                          child: _uploading
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.camera_alt,
+                                  size: 16,
+                                  color: Colors.white,
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: AppSizes.xl),
                 HaloTextField(
@@ -98,7 +135,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 HaloTextField(
                   controller: _bioController,
                   labelText: 'Giới thiệu',
-                  prefixIcon: Icons.info_outline,
                   maxLines: 3,
                   maxLength: 200,
                 ),
@@ -119,8 +155,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         context.showSnackBar('Đã cập nhật hồ sơ!');
                         Navigator.pop(context);
                       } else {
-                        context.showSnackBar('Cập nhật thất bại',
-                            isError: true);
+                        context.showSnackBar(
+                          'Cập nhật thất bại',
+                          isError: true,
+                        );
                       }
                     }
                   },
@@ -133,8 +171,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           child: CircularProgressIndicator(color: AppColors.primary),
         ),
         error: (error, _) => Center(
-          child: Text('Lỗi: $error',
-              style: const TextStyle(color: AppColors.error)),
+          child: Text(
+            'Lỗi: $error',
+            style: const TextStyle(color: AppColors.error),
+          ),
         ),
       ),
     );

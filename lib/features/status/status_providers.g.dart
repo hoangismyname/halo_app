@@ -8,12 +8,12 @@ part of 'status_providers.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Stream of all user statuses
+/// Stream of all user statuses (excluding the current user).
 
 @ProviderFor(statusesStream)
 final statusesStreamProvider = StatusesStreamProvider._();
 
-/// Stream of all user statuses
+/// Stream of all user statuses (excluding the current user).
 
 final class StatusesStreamProvider
     extends
@@ -25,7 +25,7 @@ final class StatusesStreamProvider
     with
         $FutureModifier<List<Map<String, dynamic>>>,
         $StreamProvider<List<Map<String, dynamic>>> {
-  /// Stream of all user statuses
+  /// Stream of all user statuses (excluding the current user).
   StatusesStreamProvider._()
     : super(
         from: null,
@@ -54,15 +54,30 @@ final class StatusesStreamProvider
 
 String _$statusesStreamHash() => r'9b0e98a76e05d41291815a20f5c61844666af0d7';
 
-/// Status update notifier
+/// Status update notifier.
+///
+/// Call [updateStatus] to update the current user's status.
+/// The returned [StatusUpdateResult] contains both the success flag
+/// and any error message — do NOT read the provider again after the
+/// async call, as the provider may have been auto-disposed.
 
 @ProviderFor(StatusNotifier)
 final statusProvider = StatusNotifierProvider._();
 
-/// Status update notifier
+/// Status update notifier.
+///
+/// Call [updateStatus] to update the current user's status.
+/// The returned [StatusUpdateResult] contains both the success flag
+/// and any error message — do NOT read the provider again after the
+/// async call, as the provider may have been auto-disposed.
 final class StatusNotifierProvider
     extends $AsyncNotifierProvider<StatusNotifier, void> {
-  /// Status update notifier
+  /// Status update notifier.
+  ///
+  /// Call [updateStatus] to update the current user's status.
+  /// The returned [StatusUpdateResult] contains both the success flag
+  /// and any error message — do NOT read the provider again after the
+  /// async call, as the provider may have been auto-disposed.
   StatusNotifierProvider._()
     : super(
         from: null,
@@ -82,9 +97,14 @@ final class StatusNotifierProvider
   StatusNotifier create() => StatusNotifier();
 }
 
-String _$statusNotifierHash() => r'ba88efc2ffd300304d41b176799db271d9d5243a';
+String _$statusNotifierHash() => r'1e26b88c952ebe5d1d7acdb78991f17b1c8fc21a';
 
-/// Status update notifier
+/// Status update notifier.
+///
+/// Call [updateStatus] to update the current user's status.
+/// The returned [StatusUpdateResult] contains both the success flag
+/// and any error message — do NOT read the provider again after the
+/// async call, as the provider may have been auto-disposed.
 
 abstract class _$StatusNotifier extends $AsyncNotifier<void> {
   FutureOr<void> build();

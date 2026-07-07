@@ -19,6 +19,7 @@ class HaloTextField extends StatelessWidget {
   final bool autofocus;
   final FocusNode? focusNode;
   final bool enabled;
+  final TextAlign textAlign;
 
   const HaloTextField({
     super.key,
@@ -37,6 +38,7 @@ class HaloTextField extends StatelessWidget {
     this.autofocus = false,
     this.focusNode,
     this.enabled = true,
+    this.textAlign = TextAlign.start,
   });
 
   @override
@@ -53,6 +55,8 @@ class HaloTextField extends StatelessWidget {
       autofocus: autofocus,
       focusNode: focusNode,
       enabled: enabled,
+      textAlign: textAlign,
+      textAlignVertical: TextAlignVertical.center,
       style: const TextStyle(
         fontFamily: 'Inter',
         fontSize: 15,
@@ -63,7 +67,11 @@ class HaloTextField extends StatelessWidget {
         hintText: hintText,
         labelText: labelText,
         prefixIcon: prefixIcon != null
-            ? Icon(prefixIcon, color: AppColors.textTertiary, size: AppSizes.iconMd)
+            ? Icon(
+                prefixIcon,
+                color: AppColors.textTertiary,
+                size: AppSizes.iconMd,
+              )
             : null,
         suffixIcon: suffixIcon,
         counterText: '',

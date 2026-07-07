@@ -1,12 +1,12 @@
-/// Supabase configuration - Replace with your actual project credentials
+import 'env.dart';
+
+/// Supabase configuration - loads url and anonKey from shared Env singleton
 class SupabaseConstants {
   SupabaseConstants._();
 
-  // TODO(Project Phase 2): Thay thế hai giá trị dưới đây bằng URL và Public Anon Key thật từ Supabase Project của bạn.
-  static const String url = 'https://YOUR_PROJECT_ID.supabase.co';
+  static String get url => Env.get('SUPABASE_URL');
 
-  // TODO: Replace with your Supabase anon key
-  static const String anonKey = 'YOUR_ANON_KEY';
+  static String get anonKey => Env.get('SUPABASE_ANON_KEY');
 
   // Table names
   static const String profilesTable = 'profiles';

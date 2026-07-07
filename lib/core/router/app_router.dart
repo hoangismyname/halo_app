@@ -13,19 +13,36 @@ import '../../features/chat/presentation/screens/chat_room_screen.dart';
 import '../../features/status/presentation/screens/status_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/profile/presentation/screens/edit_profile_screen.dart';
+import '../../features/profile/presentation/screens/notification_screen.dart';
+import '../../features/profile/presentation/screens/privacy_screen.dart';
+import '../../features/map/presentation/screens/map_search_screen.dart';
 import '../constants/app_colors.dart';
 
-// Shell for main navigation with bottom nav bar
-class _MainShell extends StatelessWidget {
-  final Widget child;
+final rootNavigatorKey = GlobalKey<NavigatorState>();
+
+// Shell for main navigation with IndexedStack — keeps all tab screens alive
+// so MapScreen is never disposed when switching to Chat, Friends, etc.
+// The MapWidget and its Geolocator stream stay running in the background.
+class _MainShell extends StatefulWidget {
+  final List<Widget> pages;
   final int currentIndex;
 
-  const _MainShell({required this.child, required this.currentIndex});
+  const _MainShell({required this.pages, required this.currentIndex});
+
+  @override
+  State<_MainShell> createState() => _MainShellState();
+}
+
+class _MainShellState extends State<_MainShell>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Scaffold(
-      body: child,
+      body: IndexedStack(index: widget.currentIndex, children: widget.pages),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: AppColors.bottomNav,
@@ -50,35 +67,35 @@ class _MainShell extends StatelessWidget {
                   icon: Icons.map_outlined,
                   activeIcon: Icons.map,
                   label: 'Bản đồ',
-                  isActive: currentIndex == 0,
+                  isActive: widget.currentIndex == 0,
                   onTap: () => context.go('/'),
                 ),
                 _NavItem(
                   icon: Icons.people_outline,
                   activeIcon: Icons.people,
                   label: 'Bạn bè',
-                  isActive: currentIndex == 1,
+                  isActive: widget.currentIndex == 1,
                   onTap: () => context.go('/friends'),
                 ),
                 _NavItem(
                   icon: Icons.chat_bubble_outline,
                   activeIcon: Icons.chat_bubble,
                   label: 'Chat',
-                  isActive: currentIndex == 2,
+                  isActive: widget.currentIndex == 2,
                   onTap: () => context.go('/chat'),
                 ),
                 _NavItem(
                   icon: Icons.mood_outlined,
                   activeIcon: Icons.mood,
                   label: 'Trạng thái',
-                  isActive: currentIndex == 3,
+                  isActive: widget.currentIndex == 3,
                   onTap: () => context.go('/status'),
                 ),
                 _NavItem(
                   icon: Icons.person_outline,
                   activeIcon: Icons.person,
                   label: 'Hồ sơ',
-                  isActive: currentIndex == 4,
+                  isActive: widget.currentIndex == 4,
                   onTap: () => context.go('/profile'),
                 ),
               ],
@@ -151,15 +168,23 @@ final routerProvider = Provider<GoRouter>((ref) {
   final isLoggedIn = ref.watch(isAuthenticatedProvider);
 
   return GoRouter(
-    initialLocation: '/login',
+    navigatorKey: rootNavigatorKey,
+    initialLocation: '/splash',
     redirect: (context, state) {
       final currentPath = state.matchedLocation;
       final publicPaths = ['/login', '/register', '/splash'];
 
+      // Cho phép SplashScreen tự quyết định thời điểm chuyển hướng
+      if (currentPath == '/splash') {
+        return null;
+      }
+
+      // Not logged in: redirect to login unless already on a public page
       if (!isLoggedIn && !publicPaths.contains(currentPath)) {
         return '/login';
       }
 
+      // Logged in and on auth pages: redirect to home
       if (isLoggedIn &&
           (currentPath == '/login' || currentPath == '/register')) {
         return '/';
@@ -173,26 +198,29 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/splash',
         builder: (context, state) => const SplashScreen(),
       ),
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
-      ),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
       ),
 
-      // Main shell routes
+      // Main shell routes — IndexedStack keeps all tab screens alive
       ShellRoute(
         builder: (context, state, child) {
           final index = _getNavIndex(state.matchedLocation);
-          return _MainShell(currentIndex: index, child: child);
+          return _MainShell(
+            currentIndex: index,
+            pages: const [
+              MapScreen(),
+              FriendsListScreen(),
+              ChatListScreen(),
+              StatusScreen(),
+              ProfileScreen(),
+            ],
+          );
         },
         routes: [
-          GoRoute(
-            path: '/',
-            builder: (context, state) => const MapScreen(),
-          ),
+          GoRoute(path: '/', builder: (context, state) => const MapScreen()),
           GoRoute(
             path: '/friends',
             builder: (context, state) => const FriendsListScreen(),
@@ -214,19 +242,58 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // Full-screen routes (no bottom nav)
       GoRoute(
+        path: '/map-search',
+        pageBuilder: (context, state) => _buildSlideTransitionPage(
+          context: context,
+          state: state,
+          child: const MapSearchScreen(),
+        ),
+      ),
+      GoRoute(
         path: '/add-friend',
-        builder: (context, state) => const AddFriendScreen(),
+        pageBuilder: (context, state) => _buildSlideTransitionPage(
+          context: context,
+          state: state,
+          child: const AddFriendScreen(),
+        ),
       ),
       GoRoute(
         path: '/chat/:roomId',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final roomId = state.pathParameters['roomId']!;
-          return ChatRoomScreen(roomId: roomId);
+          // Extract optional friendName from route extra for instant title
+          final extra = state.extra as Map<String, dynamic>?;
+          final friendName = extra?['friendName'] as String?;
+          return _buildSlideTransitionPage(
+            context: context,
+            state: state,
+            child: ChatRoomScreen(roomId: roomId, friendName: friendName),
+          );
         },
       ),
       GoRoute(
         path: '/edit-profile',
-        builder: (context, state) => const EditProfileScreen(),
+        pageBuilder: (context, state) => _buildSlideTransitionPage(
+          context: context,
+          state: state,
+          child: const EditProfileScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/notifications',
+        pageBuilder: (context, state) => _buildSlideTransitionPage(
+          context: context,
+          state: state,
+          child: const NotificationScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/privacy',
+        pageBuilder: (context, state) => _buildSlideTransitionPage(
+          context: context,
+          state: state,
+          child: const PrivacyScreen(),
+        ),
       ),
     ],
   );
@@ -238,4 +305,31 @@ int _getNavIndex(String location) {
   if (location.startsWith('/status')) return 3;
   if (location.startsWith('/profile')) return 4;
   return 0;
+}
+
+CustomTransitionPage _buildSlideTransitionPage({
+  required BuildContext context,
+  required GoRouterState state,
+  required Widget child,
+}) {
+  return CustomTransitionPage(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 300),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      const begin = Offset(1.0, 0.0);
+      const end = Offset.zero;
+      const curve = Curves.easeOutQuart;
+
+      final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+
+      return SlideTransition(
+        position: animation.drive(tween),
+        child: FadeTransition(
+          opacity: animation,
+          child: child,
+        ),
+      );
+    },
+  );
 }

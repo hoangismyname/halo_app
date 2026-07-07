@@ -42,6 +42,7 @@ class ProfileScreen extends ConsumerWidget {
           }
 
           return SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.all(AppSizes.lg),
             child: Column(
               children: [
@@ -164,11 +165,8 @@ class ProfileScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: AppSizes.xl),
                 // Settings
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.card,
-                    borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-                  ),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppSizes.radiusMd),
                   child: Column(
                     children: [
                       _SettingsTile(
@@ -179,20 +177,59 @@ class ProfileScreen extends ConsumerWidget {
                           onChanged: (v) {
                             ref.read(locationSharingProvider.notifier).toggle();
                           },
-                          activeThumbColor: AppColors.primary,
+                          thumbColor: WidgetStateProperty.resolveWith((states) {
+                            if (states.contains(WidgetState.selected)) {
+                              return AppColors.textOnPrimary;
+                            }
+                            return AppColors.textTertiary;
+                          }),
+                          trackColor: WidgetStateProperty.resolveWith((states) {
+                            if (states.contains(WidgetState.selected)) {
+                              return AppColors.primary;
+                            }
+                            return AppColors.surfaceLight;
+                          }),
                         ),
                       ),
+                      if (isLocationSharing) ...[
+                        const Divider(height: 1, indent: 56, endIndent: 16),
+                        _SettingsTile(
+                          icon: Icons.my_location_outlined,
+                          title: 'Độ chính xác',
+                          trailing: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: profile.locationPrecision,
+                              icon: const Icon(Icons.arrow_drop_down, color: AppColors.textTertiary),
+                              style: const TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 14,
+                                color: AppColors.textSecondary,
+                              ),
+                              dropdownColor: AppColors.card,
+                              items: const [
+                                DropdownMenuItem(value: 'absolute', child: Text('Tuyệt đối')),
+                                DropdownMenuItem(value: 'relative', child: Text('Tương đối')),
+                              ],
+                              onChanged: (val) {
+                                if (val != null) {
+                                  ref.read(locationSharingProvider.notifier).updatePrecision(val);
+                                }
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
                       const Divider(height: 1, indent: 56, endIndent: 16),
                       _SettingsTile(
                         icon: Icons.notifications_outlined,
                         title: 'Thông báo',
-                        onTap: () {},
+                        onTap: () => context.push('/notifications'),
                       ),
                       const Divider(height: 1, indent: 56, endIndent: 16),
                       _SettingsTile(
                         icon: Icons.shield_outlined,
                         title: 'Quyền riêng tư',
-                        onTap: () {},
+                        onTap: () => context.push('/privacy'),
                       ),
                     ],
                   ),
@@ -205,7 +242,6 @@ class ProfileScreen extends ConsumerWidget {
                   isLoading: isLoading,
                   onPressed: () async {
                     await ref.read(authProvider.notifier).signOut();
-                    if (context.mounted) context.go('/login');
                   },
                 ),
                 const SizedBox(height: AppSizes.xl),
@@ -289,6 +325,9 @@ class _SettingsTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       onTap: onTap,
+      tileColor: AppColors.card,
+      hoverColor: AppColors.primary.withValues(alpha: 0.08),
+      splashColor: AppColors.primary.withValues(alpha: 0.12),
       leading: Container(
         width: 36,
         height: 36,

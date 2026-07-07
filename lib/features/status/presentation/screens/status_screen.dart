@@ -37,60 +37,82 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
       body: statusesAsync.when(
         data: (statuses) {
           final filtered = statuses
-              .where((s) =>
-                  (s['status_text'] as String?)?.isNotEmpty == true ||
-                  (s['status_emoji'] as String?)?.isNotEmpty == true)
+              .where(
+                (s) =>
+                    (s['status_text'] as String?)?.isNotEmpty == true ||
+                    (s['status_emoji'] as String?)?.isNotEmpty == true,
+              )
               .toList();
 
           if (filtered.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.mood,
-                    size: 64,
-                    color: AppColors.textTertiary.withValues(alpha: 0.5),
-                  ),
-                  const SizedBox(height: AppSizes.md),
-                  const Text(
-                    'Chưa có trạng thái nào',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textTertiary,
+            return RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(statusesStreamProvider);
+              },
+              child: LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Container(
+                    height: constraints.maxHeight,
+                    alignment: Alignment.center,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.mood,
+                          size: 64,
+                          color: AppColors.textTertiary.withValues(alpha: 0.5),
+                        ),
+                        const SizedBox(height: AppSizes.md),
+                        const Text(
+                          'Chưa có trạng thái nào',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textTertiary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Hãy chia sẻ trạng thái của bạn!',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 14,
+                            color: AppColors.textTertiary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Hãy chia sẻ trạng thái của bạn!',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 14,
-                      color: AppColors.textTertiary,
-                    ),
-                  ),
-                ],
+                ),
               ),
             );
           }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(AppSizes.md),
-            itemCount: filtered.length,
-            itemBuilder: (context, index) {
-              final status = filtered[index];
-              return _StatusCard(status: status);
+          return RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(statusesStreamProvider);
             },
+            child: ListView.builder(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.all(AppSizes.md),
+              itemCount: filtered.length,
+              itemBuilder: (context, index) {
+                final status = filtered[index];
+                return _StatusCard(status: status);
+              },
+            ),
           );
         },
         loading: () => const Center(
           child: CircularProgressIndicator(color: AppColors.primary),
         ),
         error: (error, _) => Center(
-          child: Text('Lỗi: $error',
-              style: const TextStyle(color: AppColors.error)),
+          child: Text(
+            'Lỗi: $error',
+            style: const TextStyle(color: AppColors.error),
+          ),
         ),
       ),
     );
@@ -99,8 +121,22 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
   void _showUpdateStatusDialog() {
     final textController = TextEditingController();
     final commonEmojis = [
-      '😊', '😎', '🔥', '💪', '🎮', '📚', '🏃', '💤',
-      '🎵', '🍕', '☕', '✈️', '🏠', '💼', '🎉', '❤️',
+      '😊',
+      '😎',
+      '🔥',
+      '💪',
+      '🎮',
+      '📚',
+      '🏃',
+      '💤',
+      '🎵',
+      '🍕',
+      '☕',
+      '✈️',
+      '🏠',
+      '💼',
+      '🎉',
+      '❤️',
     ];
     String selectedEmoji = '😊';
 
@@ -162,8 +198,10 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
                             : null,
                       ),
                       child: Center(
-                        child:
-                            Text(emoji, style: const TextStyle(fontSize: 24)),
+                        child: Text(
+                          emoji,
+                          style: const TextStyle(fontSize: 24),
+                        ),
                       ),
                     ),
                   );
@@ -174,7 +212,9 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
                 controller: textController,
                 maxLength: 100,
                 style: const TextStyle(
-                    fontFamily: 'Inter', color: AppColors.textPrimary),
+                  fontFamily: 'Inter',
+                  color: AppColors.textPrimary,
+                ),
                 cursorColor: AppColors.primary,
                 decoration: InputDecoration(
                   hintText: 'Bạn đang làm gì?',
@@ -187,8 +227,10 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                        const BorderSide(color: AppColors.primary, width: 2),
+                    borderSide: const BorderSide(
+                      color: AppColors.primary,
+                      width: 2,
+                    ),
                   ),
                 ),
               ),
@@ -198,13 +240,27 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
                 height: 48,
                 child: ElevatedButton(
                   onPressed: () async {
-                    await ref
+                    final result = await ref
                         .read(statusProvider.notifier)
                         .updateStatus(
                           emoji: selectedEmoji,
                           text: textController.text.trim(),
                         );
-                    if (context.mounted) Navigator.pop(context);
+
+                    if (!context.mounted) return;
+
+                    if (result.success) {
+                      Navigator.pop(context);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            result.errorMessage ?? 'Cập nhật thất bại',
+                          ),
+                          backgroundColor: AppColors.error,
+                        ),
+                      );
+                    }
                   },
                   child: const Text('Lưu trạng thái'),
                 ),
@@ -225,7 +281,8 @@ class _StatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final emoji = status['status_emoji'] as String? ?? '😊';
     final text = status['status_text'] as String? ?? '';
-    final name = status['display_name'] as String? ??
+    final name =
+        status['display_name'] as String? ??
         status['username'] as String? ??
         'Unknown';
     final avatarUrl = status['avatar_url'] as String?;
@@ -297,11 +354,19 @@ class _StatusCard extends StatelessWidget {
     );
   }
 
+  // Kiểm tra chuỗi thời gian (timestamp). Nếu chuỗi không chứa ký hiệu Z hoặc offset timezone (+07:00), hệ thống sẽ tự động chèn thêm chữ 'Z' vào cuối để ép Dart hiểu rằng đây là giờ UTC
   String _timeAgo(String timestamp) {
     try {
-      final dt = DateTime.parse(timestamp);
+      var ts = timestamp;
+      if (!ts.endsWith('Z') &&
+          !ts.contains('+') &&
+          !ts.contains(RegExp(r'-\d{2}:\d{2}$'))) {
+        ts = '${ts.replaceAll(' ', 'T')}Z';
+      }
+      final dt = DateTime.parse(ts).toLocal();
       final diff = DateTime.now().difference(dt);
-      if (diff.inMinutes < 1) return 'Vừa xong';
+
+      if (diff.isNegative || diff.inMinutes < 1) return 'Vừa xong';
       if (diff.inMinutes < 60) return '${diff.inMinutes}p';
       if (diff.inHours < 24) return '${diff.inHours}h';
       return '${diff.inDays}d';

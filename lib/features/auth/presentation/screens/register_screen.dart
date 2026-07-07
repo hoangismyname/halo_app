@@ -81,6 +81,28 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
     }
   }
 
+  Future<void> _handleGoogleLogin() async {
+    final success = await ref.read(authProvider.notifier).signInWithGoogle();
+    if (!mounted) return;
+    if (success) {
+      context.go('/');
+    } else {
+      final error = ref.read(authProvider.notifier).errorMessage;
+      context.showSnackBar(error ?? 'Đăng nhập Google thất bại', isError: true);
+    }
+  }
+
+  Future<void> _handleFacebookLogin() async {
+    final success = await ref.read(authProvider.notifier).signInWithFacebook();
+    if (!mounted) return;
+    if (success) {
+      context.go('/');
+    } else {
+      final error = ref.read(authProvider.notifier).errorMessage;
+      context.showSnackBar(error ?? 'Đăng nhập Facebook thất bại', isError: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
@@ -286,6 +308,45 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                                 ),
                               ),
                             ],
+                          ),
+
+                          const SizedBox(height: AppSizes.xl),
+
+                          // Divider
+                          Row(
+                            children: [
+                              Expanded(child: Divider(color: AppColors.surfaceLight)),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: AppSizes.md),
+                                child: Text(
+                                  'Hoặc',
+                                  style: const TextStyle(
+                                    color: AppColors.textTertiary,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              Expanded(child: Divider(color: AppColors.surfaceLight)),
+                            ],
+                          ),
+
+                          const SizedBox(height: AppSizes.xl),
+
+                          // Google Login Button
+                          HaloButton(
+                            text: 'Đăng ký bằng Google',
+                            outlined: true,
+                            onPressed: isLoading ? null : _handleGoogleLogin,
+                          ),
+
+                          const SizedBox(height: AppSizes.md),
+
+                          // Facebook Login Button
+                          HaloButton(
+                            text: 'Đăng ký bằng Facebook',
+                            outlined: true,
+                            icon: Icons.facebook,
+                            onPressed: isLoading ? null : _handleFacebookLogin,
                           ),
                         ],
                       ),

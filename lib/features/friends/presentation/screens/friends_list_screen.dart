@@ -38,6 +38,7 @@ class FriendsListScreen extends ConsumerWidget {
         ],
       ),
       body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
         slivers: [
           // Pending requests section
           pendingAsync.when(
@@ -168,13 +169,22 @@ class FriendsListScreen extends ConsumerWidget {
   }
 }
 
-class _FriendTile extends ConsumerWidget {
+// ─── Friend Tile ─────────────────────────────────────────────────────────────
+
+class _FriendTile extends ConsumerStatefulWidget {
   final UserModel friend;
 
   const _FriendTile({required this.friend});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_FriendTile> createState() => _FriendTileState();
+}
+
+class _FriendTileState extends ConsumerState<_FriendTile> {
+  bool _isLoadingChat = false;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: AppSizes.sm),
       decoration: BoxDecoration(
@@ -187,15 +197,17 @@ class _FriendTile extends ConsumerWidget {
           vertical: AppSizes.xs,
         ),
         leading: HaloAvatar(
-          imageUrl: friend.avatarUrl,
-          name: friend.displayName.isNotEmpty
-              ? friend.displayName
-              : friend.username,
-          isOnline: friend.isOnline,
+          imageUrl: widget.friend.avatarUrl,
+          name: widget.friend.displayName.isNotEmpty
+              ? widget.friend.displayName
+              : widget.friend.username,
+          isOnline: widget.friend.isOnline,
           size: AppSizes.avatarMd,
         ),
         title: Text(
-          friend.displayName.isNotEmpty ? friend.displayName : friend.username,
+          widget.friend.displayName.isNotEmpty
+              ? widget.friend.displayName
+              : widget.friend.username,
           style: const TextStyle(
             fontFamily: 'Inter',
             fontWeight: FontWeight.w600,
@@ -204,13 +216,16 @@ class _FriendTile extends ConsumerWidget {
         ),
         subtitle: Row(
           children: [
-            Text(friend.statusEmoji, style: const TextStyle(fontSize: 14)),
+            Text(
+              widget.friend.statusEmoji,
+              style: const TextStyle(fontSize: 14),
+            ),
             const SizedBox(width: 4),
             Expanded(
               child: Text(
-                friend.statusText.isNotEmpty
-                    ? friend.statusText
-                    : '@${friend.username}',
+                widget.friend.statusText.isNotEmpty
+                    ? widget.friend.statusText
+                    : '@${widget.friend.username}',
                 style: const TextStyle(
                   fontFamily: 'Inter',
                   fontSize: 13,
@@ -221,19 +236,68 @@ class _FriendTile extends ConsumerWidget {
             ),
           ],
         ),
-        trailing: IconButton(
-          onPressed: () async {
-            final roomId = await ref
-                .read(chatActionsProvider.notifier)
-                .getOrCreateDM(friend.id);
-            if (roomId != null && context.mounted) {
-              context.push('/chat/$roomId');
-            }
-          },
-          icon: const Icon(
-            Icons.chat_bubble_outline,
-            color: AppColors.primary,
-            size: 20,
+        trailing: SizedBox(
+          width: 48,
+          height: 48,
+          child: Center(
+            child: _isLoadingChat
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.primary,
+                    ),
+                  )
+                : IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints:
+                        const BoxConstraints(), // Bỏ ràng buộc kích thước
+                    onPressed: () async {
+                      setState(() => _isLoadingChat = true);
+                      try {
+                        final roomId = await ref
+                            .read(chatActionsProvider.notifier)
+                            .getOrCreateDM(widget.friend.id);
+                        if (context.mounted) {
+                          if (roomId != null) {
+                            final friendName =
+                                widget.friend.displayName.isNotEmpty
+                                    ? widget.friend.displayName
+                                    : widget.friend.username;
+                            context.push(
+                              '/chat/$roomId',
+                              extra: {'friendName': friendName},
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Không thể mở cuộc trò chuyện.'),
+                                backgroundColor: AppColors.error,
+                              ),
+                            );
+                          }
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Lỗi: $e'),
+                              backgroundColor: AppColors.error,
+                              duration: const Duration(seconds: 5),
+                            ),
+                          );
+                        }
+                      } finally {
+                        if (mounted) setState(() => _isLoadingChat = false);
+                      }
+                    },
+                    icon: const Icon(
+                      Icons.chat_bubble_outline,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                  ),
           ),
         ),
       ),
@@ -241,15 +305,26 @@ class _FriendTile extends ConsumerWidget {
   }
 }
 
-class _RequestTile extends ConsumerWidget {
+// ─── Request Tile ─────────────────────────────────────────────────────────────
+
+class _RequestTile extends ConsumerStatefulWidget {
   final Map<String, dynamic> request;
 
   const _RequestTile({required this.request});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final profile = request['profiles'] as Map<String, dynamic>?;
-    final requestId = request['id'] as String;
+  ConsumerState<_RequestTile> createState() => _RequestTileState();
+}
+
+class _RequestTileState extends ConsumerState<_RequestTile> {
+  bool _isAccepting = false;
+  bool _isRejecting = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = widget.request['profiles'] as Map<String, dynamic>?;
+    final requestId = widget.request['id'] as String;
+    final isBusy = _isAccepting || _isRejecting;
 
     return Container(
       margin: const EdgeInsets.symmetric(
@@ -293,36 +368,108 @@ class _RequestTile extends ConsumerWidget {
               ],
             ),
           ),
-          // Accept
-          IconButton(
-            onPressed: () {
-              ref
-                  .read(friendsActionsProvider.notifier)
-                  .acceptRequest(requestId);
-            },
-            icon: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: AppColors.online.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
+
+          // ── Accept button ─────────────────────────────
+          if (_isAccepting)
+            const SizedBox(
+              width: 36,
+              height: 36,
+              child: Padding(
+                padding: EdgeInsets.all(8),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.online,
+                ),
               ),
-              child: const Icon(Icons.check, color: AppColors.online, size: 18),
-            ),
-          ),
-          // Reject
-          IconButton(
-            onPressed: () {
-              ref.read(friendsActionsProvider.notifier).removeFriend(requestId);
-            },
-            icon: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: AppColors.error.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
+            )
+          else
+            IconButton(
+              onPressed: isBusy
+                  ? null
+                  : () async {
+                      setState(() => _isAccepting = true);
+                      try {
+                        final success = await ref
+                            .read(friendsActionsProvider.notifier)
+                            .acceptRequest(requestId);
+                        if (context.mounted && !success) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Không thể chấp nhận lời mời. Thử lại sau.',
+                              ),
+                              backgroundColor: AppColors.error,
+                            ),
+                          );
+                        }
+                      } finally {
+                        if (mounted) setState(() => _isAccepting = false);
+                      }
+                    },
+              icon: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.online.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check,
+                  color: AppColors.online,
+                  size: 18,
+                ),
               ),
-              child: const Icon(Icons.close, color: AppColors.error, size: 18),
             ),
-          ),
+
+          // ── Reject button ─────────────────────────────
+          if (_isRejecting)
+            const SizedBox(
+              width: 36,
+              height: 36,
+              child: Padding(
+                padding: EdgeInsets.all(8),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.error,
+                ),
+              ),
+            )
+          else
+            IconButton(
+              onPressed: isBusy
+                  ? null
+                  : () async {
+                      setState(() => _isRejecting = true);
+                      try {
+                        final success = await ref
+                            .read(friendsActionsProvider.notifier)
+                            .removeFriend(requestId);
+                        if (context.mounted && !success) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Không thể từ chối lời mời. Thử lại sau.',
+                              ),
+                              backgroundColor: AppColors.error,
+                            ),
+                          );
+                        }
+                      } finally {
+                        if (mounted) setState(() => _isRejecting = false);
+                      }
+                    },
+              icon: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.close,
+                  color: AppColors.error,
+                  size: 18,
+                ),
+              ),
+            ),
         ],
       ),
     );

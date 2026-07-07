@@ -119,7 +119,7 @@ final class ProfileNotifierProvider
   ProfileNotifier create() => ProfileNotifier();
 }
 
-String _$profileNotifierHash() => r'3ac22207f0cd286cb42224fdf554ca1cb1ca1026';
+String _$profileNotifierHash() => r'f2b60c077706c0c0ecdd70411bd0409806a7624b';
 
 /// Profile update notifier
 

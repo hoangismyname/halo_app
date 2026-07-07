@@ -33,4 +33,12 @@ class ProfileNotifier extends _$ProfileNotifier {
     });
     return !state.hasError;
   }
+
+  /// Pick an image, upload it to Supabase Storage, and update the profile.
+  ///
+  /// Returns the new avatar URL on success, or null on failure.
+  Future<String?> uploadAvatar() async {
+    final repo = ref.read(profileRepositoryProvider);
+    return repo.uploadAvatar();
+  }
 }

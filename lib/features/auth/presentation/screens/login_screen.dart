@@ -33,13 +33,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic));
-    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeIn),
-    );
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+          CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic),
+        );
+    _fadeAnimation = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeIn));
     _animController.forward();
   }
 
@@ -54,7 +55,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final success = await ref.read(authProvider.notifier).signIn(
+    final success = await ref
+        .read(authProvider.notifier)
+        .signIn(
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
@@ -66,6 +69,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     } else {
       final error = ref.read(authProvider.notifier).errorMessage;
       context.showSnackBar(error ?? 'Đăng nhập thất bại', isError: true);
+    }
+  }
+
+  Future<void> _handleGoogleLogin() async {
+    final success = await ref.read(authProvider.notifier).signInWithGoogle();
+
+    if (!mounted) return;
+
+    if (success) {
+      context.go('/');
+    } else {
+      final error = ref.read(authProvider.notifier).errorMessage;
+      context.showSnackBar(error ?? 'Đăng nhập Google thất bại', isError: true);
+    }
+  }
+
+  Future<void> _handleFacebookLogin() async {
+    final success = await ref.read(authProvider.notifier).signInWithFacebook();
+
+    if (!mounted) return;
+
+    if (success) {
+      context.go('/');
+    } else {
+      final error = ref.read(authProvider.notifier).errorMessage;
+      context.showSnackBar(error ?? 'Đăng nhập Facebook thất bại', isError: true);
     }
   }
 
@@ -109,13 +138,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               gradient: AppColors.primaryGradient,
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.primary.withValues(alpha: 0.3),
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.3,
+                                  ),
                                   blurRadius: 20,
                                   spreadRadius: 2,
                                 ),
                               ],
                             ),
-                            child: const Icon(Icons.public, size: 40, color: Colors.white),
+                            child: const Icon(
+                              Icons.public,
+                              size: 40,
+                              color: Colors.white,
+                            ),
                           ),
 
                           // Title
@@ -142,14 +177,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               color: AppColors.textSecondary,
                               fontSize: 14,
                             ),
-                          ),
-                          const SizedBox(height: AppSizes.xl),
-                          HaloButton(
-                            text: 'Trải nghiệm (Guest Mode)',
-                            onPressed: () {
-                              ref.read(authProvider.notifier).signInAsGuest();
-                            },
-                            outlined: true,
                           ),
                           const SizedBox(height: AppSizes.xl),
 
@@ -185,8 +212,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                     : Icons.visibility_outlined,
                                 color: AppColors.textTertiary,
                               ),
-                              onPressed: () =>
-                                  setState(() => _obscurePassword = !_obscurePassword),
+                              onPressed: () => setState(
+                                () => _obscurePassword = !_obscurePassword,
+                              ),
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
@@ -233,6 +261,45 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                 ),
                               ),
                             ],
+                          ),
+
+                          const SizedBox(height: AppSizes.xl),
+
+                          // Divider
+                          Row(
+                            children: [
+                              Expanded(child: Divider(color: AppColors.surfaceLight)),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: AppSizes.md),
+                                child: Text(
+                                  'Hoặc',
+                                  style: const TextStyle(
+                                    color: AppColors.textTertiary,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              Expanded(child: Divider(color: AppColors.surfaceLight)),
+                            ],
+                          ),
+
+                          const SizedBox(height: AppSizes.xl),
+
+                          // Google Login Button
+                          HaloButton(
+                            text: 'Tiếp tục với Google',
+                            outlined: true,
+                            onPressed: isLoading ? null : _handleGoogleLogin,
+                          ),
+
+                          const SizedBox(height: AppSizes.md),
+
+                          // Facebook Login Button
+                          HaloButton(
+                            text: 'Tiếp tục với Facebook',
+                            outlined: true,
+                            icon: Icons.facebook,
+                            onPressed: isLoading ? null : _handleFacebookLogin,
                           ),
                         ],
                       ),

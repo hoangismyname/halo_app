@@ -47,7 +47,7 @@ final class FriendLocationsProvider
   }
 }
 
-String _$friendLocationsHash() => r'922931fc09dbcaff24cbd7fbc55ba11c7091de5c';
+String _$friendLocationsHash() => r'f0e51089aabf5032ec560d699ad6b8f2dbe350c8';
 
 /// Friend locations map: userId -> {lat, lng, timestamp}
 
@@ -114,7 +114,7 @@ final class LocationSharingProvider
   }
 }
 
-String _$locationSharingHash() => r'a7a6da4316e515fafd6355985994254d1131f7b0';
+String _$locationSharingHash() => r'3482d28312effad3e0b40fe0a0cfec6dbf53ba45';
 
 /// Location sharing toggle
 

@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$UserModel {
 
- String get id; String get username; String get displayName; String? get avatarUrl; String get bio; String get statusEmoji; String get statusText; double? get latitude; double? get longitude; DateTime? get locationUpdatedAt; bool get isOnline; DateTime? get lastSeen; DateTime? get createdAt; DateTime? get updatedAt;
+ String get id; String get username;@JsonKey(name: 'display_name') String get displayName;@JsonKey(name: 'avatar_url') String? get avatarUrl; String get bio;@JsonKey(name: 'status_emoji') String get statusEmoji;@JsonKey(name: 'status_text') String get statusText; double? get latitude; double? get longitude;@JsonKey(name: 'location_updated_at') DateTime? get locationUpdatedAt;@JsonKey(name: 'is_online') bool get isOnline;@JsonKey(name: 'last_seen') DateTime? get lastSeen;@JsonKey(name: 'is_location_shared') bool get isLocationShared;@JsonKey(name: 'location_precision') String get locationPrecision;@JsonKey(name: 'created_at') DateTime? get createdAt;@JsonKey(name: 'updated_at') DateTime? get updatedAt;
 /// Create a copy of UserModel
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $UserModelCopyWith<UserModel> get copyWith => _$UserModelCopyWithImpl<UserModel>
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is UserModel&&(identical(other.id, id) || other.id == id)&&(identical(other.username, username) || other.username == username)&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.avatarUrl, avatarUrl) || other.avatarUrl == avatarUrl)&&(identical(other.bio, bio) || other.bio == bio)&&(identical(other.statusEmoji, statusEmoji) || other.statusEmoji == statusEmoji)&&(identical(other.statusText, statusText) || other.statusText == statusText)&&(identical(other.latitude, latitude) || other.latitude == latitude)&&(identical(other.longitude, longitude) || other.longitude == longitude)&&(identical(other.locationUpdatedAt, locationUpdatedAt) || other.locationUpdatedAt == locationUpdatedAt)&&(identical(other.isOnline, isOnline) || other.isOnline == isOnline)&&(identical(other.lastSeen, lastSeen) || other.lastSeen == lastSeen)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is UserModel&&(identical(other.id, id) || other.id == id)&&(identical(other.username, username) || other.username == username)&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.avatarUrl, avatarUrl) || other.avatarUrl == avatarUrl)&&(identical(other.bio, bio) || other.bio == bio)&&(identical(other.statusEmoji, statusEmoji) || other.statusEmoji == statusEmoji)&&(identical(other.statusText, statusText) || other.statusText == statusText)&&(identical(other.latitude, latitude) || other.latitude == latitude)&&(identical(other.longitude, longitude) || other.longitude == longitude)&&(identical(other.locationUpdatedAt, locationUpdatedAt) || other.locationUpdatedAt == locationUpdatedAt)&&(identical(other.isOnline, isOnline) || other.isOnline == isOnline)&&(identical(other.lastSeen, lastSeen) || other.lastSeen == lastSeen)&&(identical(other.isLocationShared, isLocationShared) || other.isLocationShared == isLocationShared)&&(identical(other.locationPrecision, locationPrecision) || other.locationPrecision == locationPrecision)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,username,displayName,avatarUrl,bio,statusEmoji,statusText,latitude,longitude,locationUpdatedAt,isOnline,lastSeen,createdAt,updatedAt);
+int get hashCode => Object.hash(runtimeType,id,username,displayName,avatarUrl,bio,statusEmoji,statusText,latitude,longitude,locationUpdatedAt,isOnline,lastSeen,isLocationShared,locationPrecision,createdAt,updatedAt);
 
 @override
 String toString() {
-  return 'UserModel(id: $id, username: $username, displayName: $displayName, avatarUrl: $avatarUrl, bio: $bio, statusEmoji: $statusEmoji, statusText: $statusText, latitude: $latitude, longitude: $longitude, locationUpdatedAt: $locationUpdatedAt, isOnline: $isOnline, lastSeen: $lastSeen, createdAt: $createdAt, updatedAt: $updatedAt)';
+  return 'UserModel(id: $id, username: $username, displayName: $displayName, avatarUrl: $avatarUrl, bio: $bio, statusEmoji: $statusEmoji, statusText: $statusText, latitude: $latitude, longitude: $longitude, locationUpdatedAt: $locationUpdatedAt, isOnline: $isOnline, lastSeen: $lastSeen, isLocationShared: $isLocationShared, locationPrecision: $locationPrecision, createdAt: $createdAt, updatedAt: $updatedAt)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $UserModelCopyWith<$Res>  {
   factory $UserModelCopyWith(UserModel value, $Res Function(UserModel) _then) = _$UserModelCopyWithImpl;
 @useResult
 $Res call({
- String id, String username, String displayName, String? avatarUrl, String bio, String statusEmoji, String statusText, double? latitude, double? longitude, DateTime? locationUpdatedAt, bool isOnline, DateTime? lastSeen, DateTime? createdAt, DateTime? updatedAt
+ String id, String username,@JsonKey(name: 'display_name') String displayName,@JsonKey(name: 'avatar_url') String? avatarUrl, String bio,@JsonKey(name: 'status_emoji') String statusEmoji,@JsonKey(name: 'status_text') String statusText, double? latitude, double? longitude,@JsonKey(name: 'location_updated_at') DateTime? locationUpdatedAt,@JsonKey(name: 'is_online') bool isOnline,@JsonKey(name: 'last_seen') DateTime? lastSeen,@JsonKey(name: 'is_location_shared') bool isLocationShared,@JsonKey(name: 'location_precision') String locationPrecision,@JsonKey(name: 'created_at') DateTime? createdAt,@JsonKey(name: 'updated_at') DateTime? updatedAt
 });
 
 
@@ -65,7 +65,7 @@ class _$UserModelCopyWithImpl<$Res>
 
 /// Create a copy of UserModel
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? username = null,Object? displayName = null,Object? avatarUrl = freezed,Object? bio = null,Object? statusEmoji = null,Object? statusText = null,Object? latitude = freezed,Object? longitude = freezed,Object? locationUpdatedAt = freezed,Object? isOnline = null,Object? lastSeen = freezed,Object? createdAt = freezed,Object? updatedAt = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? username = null,Object? displayName = null,Object? avatarUrl = freezed,Object? bio = null,Object? statusEmoji = null,Object? statusText = null,Object? latitude = freezed,Object? longitude = freezed,Object? locationUpdatedAt = freezed,Object? isOnline = null,Object? lastSeen = freezed,Object? isLocationShared = null,Object? locationPrecision = null,Object? createdAt = freezed,Object? updatedAt = freezed,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,username: null == username ? _self.username : username // ignore: cast_nullable_to_non_nullable
@@ -79,7 +79,9 @@ as double?,longitude: freezed == longitude ? _self.longitude : longitude // igno
 as double?,locationUpdatedAt: freezed == locationUpdatedAt ? _self.locationUpdatedAt : locationUpdatedAt // ignore: cast_nullable_to_non_nullable
 as DateTime?,isOnline: null == isOnline ? _self.isOnline : isOnline // ignore: cast_nullable_to_non_nullable
 as bool,lastSeen: freezed == lastSeen ? _self.lastSeen : lastSeen // ignore: cast_nullable_to_non_nullable
-as DateTime?,createdAt: freezed == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
+as DateTime?,isLocationShared: null == isLocationShared ? _self.isLocationShared : isLocationShared // ignore: cast_nullable_to_non_nullable
+as bool,locationPrecision: null == locationPrecision ? _self.locationPrecision : locationPrecision // ignore: cast_nullable_to_non_nullable
+as String,createdAt: freezed == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
 as DateTime?,updatedAt: freezed == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
 as DateTime?,
   ));
@@ -166,10 +168,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String username,  String displayName,  String? avatarUrl,  String bio,  String statusEmoji,  String statusText,  double? latitude,  double? longitude,  DateTime? locationUpdatedAt,  bool isOnline,  DateTime? lastSeen,  DateTime? createdAt,  DateTime? updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String username, @JsonKey(name: 'display_name')  String displayName, @JsonKey(name: 'avatar_url')  String? avatarUrl,  String bio, @JsonKey(name: 'status_emoji')  String statusEmoji, @JsonKey(name: 'status_text')  String statusText,  double? latitude,  double? longitude, @JsonKey(name: 'location_updated_at')  DateTime? locationUpdatedAt, @JsonKey(name: 'is_online')  bool isOnline, @JsonKey(name: 'last_seen')  DateTime? lastSeen, @JsonKey(name: 'is_location_shared')  bool isLocationShared, @JsonKey(name: 'location_precision')  String locationPrecision, @JsonKey(name: 'created_at')  DateTime? createdAt, @JsonKey(name: 'updated_at')  DateTime? updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _UserModel() when $default != null:
-return $default(_that.id,_that.username,_that.displayName,_that.avatarUrl,_that.bio,_that.statusEmoji,_that.statusText,_that.latitude,_that.longitude,_that.locationUpdatedAt,_that.isOnline,_that.lastSeen,_that.createdAt,_that.updatedAt);case _:
+return $default(_that.id,_that.username,_that.displayName,_that.avatarUrl,_that.bio,_that.statusEmoji,_that.statusText,_that.latitude,_that.longitude,_that.locationUpdatedAt,_that.isOnline,_that.lastSeen,_that.isLocationShared,_that.locationPrecision,_that.createdAt,_that.updatedAt);case _:
   return orElse();
 
 }
@@ -187,10 +189,10 @@ return $default(_that.id,_that.username,_that.displayName,_that.avatarUrl,_that.
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String username,  String displayName,  String? avatarUrl,  String bio,  String statusEmoji,  String statusText,  double? latitude,  double? longitude,  DateTime? locationUpdatedAt,  bool isOnline,  DateTime? lastSeen,  DateTime? createdAt,  DateTime? updatedAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String username, @JsonKey(name: 'display_name')  String displayName, @JsonKey(name: 'avatar_url')  String? avatarUrl,  String bio, @JsonKey(name: 'status_emoji')  String statusEmoji, @JsonKey(name: 'status_text')  String statusText,  double? latitude,  double? longitude, @JsonKey(name: 'location_updated_at')  DateTime? locationUpdatedAt, @JsonKey(name: 'is_online')  bool isOnline, @JsonKey(name: 'last_seen')  DateTime? lastSeen, @JsonKey(name: 'is_location_shared')  bool isLocationShared, @JsonKey(name: 'location_precision')  String locationPrecision, @JsonKey(name: 'created_at')  DateTime? createdAt, @JsonKey(name: 'updated_at')  DateTime? updatedAt)  $default,) {final _that = this;
 switch (_that) {
 case _UserModel():
-return $default(_that.id,_that.username,_that.displayName,_that.avatarUrl,_that.bio,_that.statusEmoji,_that.statusText,_that.latitude,_that.longitude,_that.locationUpdatedAt,_that.isOnline,_that.lastSeen,_that.createdAt,_that.updatedAt);case _:
+return $default(_that.id,_that.username,_that.displayName,_that.avatarUrl,_that.bio,_that.statusEmoji,_that.statusText,_that.latitude,_that.longitude,_that.locationUpdatedAt,_that.isOnline,_that.lastSeen,_that.isLocationShared,_that.locationPrecision,_that.createdAt,_that.updatedAt);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -207,10 +209,10 @@ return $default(_that.id,_that.username,_that.displayName,_that.avatarUrl,_that.
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String username,  String displayName,  String? avatarUrl,  String bio,  String statusEmoji,  String statusText,  double? latitude,  double? longitude,  DateTime? locationUpdatedAt,  bool isOnline,  DateTime? lastSeen,  DateTime? createdAt,  DateTime? updatedAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String username, @JsonKey(name: 'display_name')  String displayName, @JsonKey(name: 'avatar_url')  String? avatarUrl,  String bio, @JsonKey(name: 'status_emoji')  String statusEmoji, @JsonKey(name: 'status_text')  String statusText,  double? latitude,  double? longitude, @JsonKey(name: 'location_updated_at')  DateTime? locationUpdatedAt, @JsonKey(name: 'is_online')  bool isOnline, @JsonKey(name: 'last_seen')  DateTime? lastSeen, @JsonKey(name: 'is_location_shared')  bool isLocationShared, @JsonKey(name: 'location_precision')  String locationPrecision, @JsonKey(name: 'created_at')  DateTime? createdAt, @JsonKey(name: 'updated_at')  DateTime? updatedAt)?  $default,) {final _that = this;
 switch (_that) {
 case _UserModel() when $default != null:
-return $default(_that.id,_that.username,_that.displayName,_that.avatarUrl,_that.bio,_that.statusEmoji,_that.statusText,_that.latitude,_that.longitude,_that.locationUpdatedAt,_that.isOnline,_that.lastSeen,_that.createdAt,_that.updatedAt);case _:
+return $default(_that.id,_that.username,_that.displayName,_that.avatarUrl,_that.bio,_that.statusEmoji,_that.statusText,_that.latitude,_that.longitude,_that.locationUpdatedAt,_that.isOnline,_that.lastSeen,_that.isLocationShared,_that.locationPrecision,_that.createdAt,_that.updatedAt);case _:
   return null;
 
 }
@@ -222,23 +224,25 @@ return $default(_that.id,_that.username,_that.displayName,_that.avatarUrl,_that.
 @JsonSerializable()
 
 class _UserModel implements UserModel {
-  const _UserModel({required this.id, required this.username, this.displayName = '', this.avatarUrl, this.bio = '', this.statusEmoji = '😊', this.statusText = '', this.latitude, this.longitude, this.locationUpdatedAt, this.isOnline = false, this.lastSeen, this.createdAt, this.updatedAt});
+  const _UserModel({required this.id, required this.username, @JsonKey(name: 'display_name') this.displayName = '', @JsonKey(name: 'avatar_url') this.avatarUrl, this.bio = '', @JsonKey(name: 'status_emoji') this.statusEmoji = '😊', @JsonKey(name: 'status_text') this.statusText = '', this.latitude, this.longitude, @JsonKey(name: 'location_updated_at') this.locationUpdatedAt, @JsonKey(name: 'is_online') this.isOnline = false, @JsonKey(name: 'last_seen') this.lastSeen, @JsonKey(name: 'is_location_shared') this.isLocationShared = true, @JsonKey(name: 'location_precision') this.locationPrecision = 'absolute', @JsonKey(name: 'created_at') this.createdAt, @JsonKey(name: 'updated_at') this.updatedAt});
   factory _UserModel.fromJson(Map<String, dynamic> json) => _$UserModelFromJson(json);
 
 @override final  String id;
 @override final  String username;
-@override@JsonKey() final  String displayName;
-@override final  String? avatarUrl;
+@override@JsonKey(name: 'display_name') final  String displayName;
+@override@JsonKey(name: 'avatar_url') final  String? avatarUrl;
 @override@JsonKey() final  String bio;
-@override@JsonKey() final  String statusEmoji;
-@override@JsonKey() final  String statusText;
+@override@JsonKey(name: 'status_emoji') final  String statusEmoji;
+@override@JsonKey(name: 'status_text') final  String statusText;
 @override final  double? latitude;
 @override final  double? longitude;
-@override final  DateTime? locationUpdatedAt;
-@override@JsonKey() final  bool isOnline;
-@override final  DateTime? lastSeen;
-@override final  DateTime? createdAt;
-@override final  DateTime? updatedAt;
+@override@JsonKey(name: 'location_updated_at') final  DateTime? locationUpdatedAt;
+@override@JsonKey(name: 'is_online') final  bool isOnline;
+@override@JsonKey(name: 'last_seen') final  DateTime? lastSeen;
+@override@JsonKey(name: 'is_location_shared') final  bool isLocationShared;
+@override@JsonKey(name: 'location_precision') final  String locationPrecision;
+@override@JsonKey(name: 'created_at') final  DateTime? createdAt;
+@override@JsonKey(name: 'updated_at') final  DateTime? updatedAt;
 
 /// Create a copy of UserModel
 /// with the given fields replaced by the non-null parameter values.
@@ -253,16 +257,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _UserModel&&(identical(other.id, id) || other.id == id)&&(identical(other.username, username) || other.username == username)&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.avatarUrl, avatarUrl) || other.avatarUrl == avatarUrl)&&(identical(other.bio, bio) || other.bio == bio)&&(identical(other.statusEmoji, statusEmoji) || other.statusEmoji == statusEmoji)&&(identical(other.statusText, statusText) || other.statusText == statusText)&&(identical(other.latitude, latitude) || other.latitude == latitude)&&(identical(other.longitude, longitude) || other.longitude == longitude)&&(identical(other.locationUpdatedAt, locationUpdatedAt) || other.locationUpdatedAt == locationUpdatedAt)&&(identical(other.isOnline, isOnline) || other.isOnline == isOnline)&&(identical(other.lastSeen, lastSeen) || other.lastSeen == lastSeen)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _UserModel&&(identical(other.id, id) || other.id == id)&&(identical(other.username, username) || other.username == username)&&(identical(other.displayName, displayName) || other.displayName == displayName)&&(identical(other.avatarUrl, avatarUrl) || other.avatarUrl == avatarUrl)&&(identical(other.bio, bio) || other.bio == bio)&&(identical(other.statusEmoji, statusEmoji) || other.statusEmoji == statusEmoji)&&(identical(other.statusText, statusText) || other.statusText == statusText)&&(identical(other.latitude, latitude) || other.latitude == latitude)&&(identical(other.longitude, longitude) || other.longitude == longitude)&&(identical(other.locationUpdatedAt, locationUpdatedAt) || other.locationUpdatedAt == locationUpdatedAt)&&(identical(other.isOnline, isOnline) || other.isOnline == isOnline)&&(identical(other.lastSeen, lastSeen) || other.lastSeen == lastSeen)&&(identical(other.isLocationShared, isLocationShared) || other.isLocationShared == isLocationShared)&&(identical(other.locationPrecision, locationPrecision) || other.locationPrecision == locationPrecision)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,username,displayName,avatarUrl,bio,statusEmoji,statusText,latitude,longitude,locationUpdatedAt,isOnline,lastSeen,createdAt,updatedAt);
+int get hashCode => Object.hash(runtimeType,id,username,displayName,avatarUrl,bio,statusEmoji,statusText,latitude,longitude,locationUpdatedAt,isOnline,lastSeen,isLocationShared,locationPrecision,createdAt,updatedAt);
 
 @override
 String toString() {
-  return 'UserModel(id: $id, username: $username, displayName: $displayName, avatarUrl: $avatarUrl, bio: $bio, statusEmoji: $statusEmoji, statusText: $statusText, latitude: $latitude, longitude: $longitude, locationUpdatedAt: $locationUpdatedAt, isOnline: $isOnline, lastSeen: $lastSeen, createdAt: $createdAt, updatedAt: $updatedAt)';
+  return 'UserModel(id: $id, username: $username, displayName: $displayName, avatarUrl: $avatarUrl, bio: $bio, statusEmoji: $statusEmoji, statusText: $statusText, latitude: $latitude, longitude: $longitude, locationUpdatedAt: $locationUpdatedAt, isOnline: $isOnline, lastSeen: $lastSeen, isLocationShared: $isLocationShared, locationPrecision: $locationPrecision, createdAt: $createdAt, updatedAt: $updatedAt)';
 }
 
 
@@ -273,7 +277,7 @@ abstract mixin class _$UserModelCopyWith<$Res> implements $UserModelCopyWith<$Re
   factory _$UserModelCopyWith(_UserModel value, $Res Function(_UserModel) _then) = __$UserModelCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String username, String displayName, String? avatarUrl, String bio, String statusEmoji, String statusText, double? latitude, double? longitude, DateTime? locationUpdatedAt, bool isOnline, DateTime? lastSeen, DateTime? createdAt, DateTime? updatedAt
+ String id, String username,@JsonKey(name: 'display_name') String displayName,@JsonKey(name: 'avatar_url') String? avatarUrl, String bio,@JsonKey(name: 'status_emoji') String statusEmoji,@JsonKey(name: 'status_text') String statusText, double? latitude, double? longitude,@JsonKey(name: 'location_updated_at') DateTime? locationUpdatedAt,@JsonKey(name: 'is_online') bool isOnline,@JsonKey(name: 'last_seen') DateTime? lastSeen,@JsonKey(name: 'is_location_shared') bool isLocationShared,@JsonKey(name: 'location_precision') String locationPrecision,@JsonKey(name: 'created_at') DateTime? createdAt,@JsonKey(name: 'updated_at') DateTime? updatedAt
 });
 
 
@@ -290,7 +294,7 @@ class __$UserModelCopyWithImpl<$Res>
 
 /// Create a copy of UserModel
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? username = null,Object? displayName = null,Object? avatarUrl = freezed,Object? bio = null,Object? statusEmoji = null,Object? statusText = null,Object? latitude = freezed,Object? longitude = freezed,Object? locationUpdatedAt = freezed,Object? isOnline = null,Object? lastSeen = freezed,Object? createdAt = freezed,Object? updatedAt = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? username = null,Object? displayName = null,Object? avatarUrl = freezed,Object? bio = null,Object? statusEmoji = null,Object? statusText = null,Object? latitude = freezed,Object? longitude = freezed,Object? locationUpdatedAt = freezed,Object? isOnline = null,Object? lastSeen = freezed,Object? isLocationShared = null,Object? locationPrecision = null,Object? createdAt = freezed,Object? updatedAt = freezed,}) {
   return _then(_UserModel(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,username: null == username ? _self.username : username // ignore: cast_nullable_to_non_nullable
@@ -304,7 +308,9 @@ as double?,longitude: freezed == longitude ? _self.longitude : longitude // igno
 as double?,locationUpdatedAt: freezed == locationUpdatedAt ? _self.locationUpdatedAt : locationUpdatedAt // ignore: cast_nullable_to_non_nullable
 as DateTime?,isOnline: null == isOnline ? _self.isOnline : isOnline // ignore: cast_nullable_to_non_nullable
 as bool,lastSeen: freezed == lastSeen ? _self.lastSeen : lastSeen // ignore: cast_nullable_to_non_nullable
-as DateTime?,createdAt: freezed == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
+as DateTime?,isLocationShared: null == isLocationShared ? _self.isLocationShared : isLocationShared // ignore: cast_nullable_to_non_nullable
+as bool,locationPrecision: null == locationPrecision ? _self.locationPrecision : locationPrecision // ignore: cast_nullable_to_non_nullable
+as String,createdAt: freezed == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
 as DateTime?,updatedAt: freezed == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
 as DateTime?,
   ));
